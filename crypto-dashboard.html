@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Crypto Dashboard</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --bg:#0a0a0f;
+  --card:#111118;
+  --card2:#16161f;
+  --border:#1e1e2e;
+  --text:#e2e2e8;
+  --muted:#6b6b80;
+  --green:#00d4aa;
+  --red:#ff4d6d;
+  --yellow:#f5c518;
+  --blue:#4f8ef7;
+  --orange:#f39c12;
+  --purple:#9b59b6;
+}
+
+body {
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+  min-height:100vh;
+  max-width:430px;
+  margin:0 auto;
+  padding-bottom:80px;
+}
+
+/* ── TABS ── */
+.tabs-bar {
+  position:fixed;
+  bottom:0; left:50%;
+  transform:translateX(-50%);
+  width:100%; max-width:430px;
+  background:var(--card);
+  border-top:1px solid var(--border);
+  display:flex;
+  z-index:100;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+
+.tab-btn {
+  flex:1;
+  padding:12px 0 10px;
+  background:none;
+  border:none;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:0.3px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  transition:color 0.2s;
+}
+
+.tab-btn .icon { font-size:20px; }
+.tab-btn.active { color:var(--green); }
+
+/* ── PAGES ── */
+.page { display:none; padding:16px; }
+.page.active { display:block; }
+
+/* ── HEADER ── */
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+  padding-bottom:16px;
+  border-bottom:1px solid var(--border);
+}
+
+.header h1 { font-size:18px; font-weight:700; letter-spacing:-0.5px; }
+.header span { font-size:11px; color:var(--muted); display:block; margin-top:2px; }
+
+.live-dot {
+  display:flex; align-items:center; gap:6px;
+  font-size:11px; color:var(--green);
+}
+.live-dot::before {
+  content:''; width:6px; height:6px;
+  border-radius:50%; background:var(--green);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── SETUP KEY ── */
+.setup-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:16px;
+}
+.setup-card h3 { font-size:15px; margin-bottom:8px; }
+.setup-card p { font-size:12px; color:var(--muted); margin-bottom:14px; line-height:1.5; }
+
+.input-field {
+  width:100%;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 14px;
+  color:var(--text);
+  font-size:13px;
+  margin-bottom:10px;
+  outline:none;
+}
+.input-field:focus { border-color:var(--green); }
+
+/* ── PRICES ── */
+.prices-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:16px;
+}
+
+.price-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px 14px;
+}
+.price-card .sym { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:0.5px; }
+.price-card .prc { font-size:17px; font-weight:700; margin-top:4px; letter-spacing:-0.5px; }
+.price-card .chg { font-size:11px; margin-top:2px; font-weight:600; }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  width:100%; padding:16px;
+  background:var(--green); color:#000;
+  border:none; border-radius:14px;
+  font-size:15px; font-weight:700;
+  cursor:pointer; margin-bottom:20px;
+  display:flex; align-items:center;
+  justify-content:center; gap:8px;
+  transition:opacity 0.2s;
+}
+.btn-primary:hover { opacity:0.85; }
+.btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+
+.btn-secondary {
+  width:100%; padding:13px;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:12px;
+  color:var(--text);
+  font-size:13px; font-weight:600;
+  cursor:pointer; margin-bottom:10px;
+  transition:border-color 0.2s;
+}
+.btn-secondary:hover { border-color:var(--green); }
+
+.btn-danger {
+  width:100%; padding:13px;
+  background:rgba(255,77,109,0.1);
+  border:1px solid rgba(255,77,109,0.3);
+  border-radius:12px;
+  color:var(--red);
+  font-size:13px; font-weight:600;
+  cursor:pointer; margin-bottom:10px;
+}
+
+/* ── SECTION TITLE ── */
+.sec-title {
+  font-size:12px; font-weight:700;
+  letter-spacing:1px; color:var(--muted);
+  text-transform:uppercase; margin-bottom:10px;
+}
+
+/* ── POSITION CARD ── */
+.pos-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:12px;
+}
+
+.pos-header {
+  display:flex; justify-content:space-between;
+  align-items:center; margin-bottom:14px;
+}
+.pos-sym { display:flex; align-items:center; gap:8px; }
+.pos-sym .name { font-size:16px; font-weight:700; }
+
+.badge {
+  font-size:10px; font-weight:700;
+  padding:3px 7px; border-radius:6px;
+  letter-spacing:0.3px;
+}
+.badge-long { background:rgba(0,212,170,0.15); color:var(--green); border:1px solid rgba(0,212,170,0.3); }
+.badge-short { background:rgba(255,77,109,0.15); color:var(--red); border:1px solid rgba(255,77,109,0.3); }
+.badge-lev { background:rgba(79,142,247,0.15); color:var(--blue); border:1px solid rgba(79,142,247,0.3); }
+
+.roe { font-size:20px; font-weight:700; }
+
+.stats-row {
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  gap:8px; margin-bottom:14px;
+}
+.stat {
+  background:var(--bg); border-radius:10px; padding:8px 10px;
+}
+.stat .lbl { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:0.3px; }
+.stat .val { font-size:13px; font-weight:700; margin-top:3px; }
+
+.levels { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.level-row {
+  display:flex; justify-content:space-between;
+  align-items:center; padding:6px 10px;
+  border-radius:8px; background:var(--bg);
+}
+.level-row .lbl { font-size:11px; color:var(--muted); font-weight:600; }
+.level-row .prc { font-size:13px; font-weight:700; }
+.level-row .dist { font-size:11px; font-weight:600; }
+
+.capital-row {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:8px; margin-bottom:14px;
+}
+.cap-item {
+  background:var(--bg); border-radius:10px; padding:8px 10px;
+}
+.cap-item .lbl { font-size:10px; color:var(--muted); font-weight:600; }
+.cap-item .val { font-size:13px; font-weight:700; margin-top:3px; color:var(--blue); }
+
+/* ── REC CARD ── */
+.rec-card {
+  border-radius:12px; padding:14px;
+}
+.rec-mantener { background:rgba(0,212,170,0.08); border:1px solid rgba(0,212,170,0.25); }
+.rec-tp { background:rgba(245,197,24,0.08); border:1px solid rgba(245,197,24,0.25); }
+.rec-anadir { background:rgba(79,142,247,0.08); border:1px solid rgba(79,142,247,0.25); }
+.rec-precaucion { background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.25); }
+.rec-cerrar { background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.25); }
+.rec-corto { background:rgba(155,89,182,0.08); border:1px solid rgba(155,89,182,0.25); }
+
+.rec-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.rec-tag { font-size:12px; font-weight:800; letter-spacing:0.5px; }
+.rec-text { font-size:13px; color:var(--text); line-height:1.6; }
+
+.rec-details { margin-top:10px; display:flex; flex-direction:column; gap:5px; }
+.rec-detail-row { display:flex; justify-content:space-between; font-size:12px; }
+.rec-detail-row .k { color:var(--muted); }
+.rec-detail-row .v { font-weight:700; }
+
+.risk-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; font-weight:700;
+  padding:4px 10px; border-radius:20px; margin-top:10px;
+}
+.risk-mod { background:rgba(245,197,24,0.15); color:var(--yellow); border:1px solid rgba(245,197,24,0.3); }
+.risk-cau { background:rgba(0,212,170,0.15); color:var(--green); border:1px solid rgba(0,212,170,0.3); }
+.risk-agr { background:rgba(255,77,109,0.15); color:var(--red); border:1px solid rgba(255,77,109,0.3); }
+
+/* ── CONTEXT BTC ── */
+.btc-ctx {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:12px 14px;
+  margin-bottom:12px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.btc-ctx .lbl { font-size:12px; color:var(--muted); }
+.btc-ctx .val { font-size:13px; font-weight:700; }
+
+/* ── DIVIDER ── */
+.divider { height:1px; background:var(--border); margin:20px 0; }
+
+/* ── LOADING ── */
+.loading {
+  text-align:center; padding:20px;
+  color:var(--muted); font-size:13px;
+}
+.spinner {
+  display:inline-block; width:20px; height:20px;
+  border:2px solid var(--border);
+  border-top-color:var(--green);
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+  margin-bottom:8px;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── HISTORIAL ── */
+.summary-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:8px; margin-bottom:20px;
+}
+.summary-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:14px;
+}
+.summary-card .lbl { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:0.3px; }
+.summary-card .val { font-size:18px; font-weight:700; margin-top:4px; }
+.summary-card .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+
+.trade-history-item {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:14px; margin-bottom:8px;
+}
+.th-header { display:flex; justify-content:space-between; margin-bottom:10px; }
+.th-sym { font-size:15px; font-weight:700; }
+.th-result { font-size:15px; font-weight:700; }
+.th-details { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.th-detail { font-size:11px; color:var(--muted); }
+.th-detail span { color:var(--text); font-weight:600; }
+.th-badge {
+  display:inline-block; font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:20px; margin-top:8px;
+}
+.th-open { background:rgba(0,212,170,0.15); color:var(--green); }
+.th-closed { background:rgba(107,107,128,0.2); color:var(--muted); }
+.th-sl { background:rgba(255,77,109,0.15); color:var(--red); }
+
+/* ── FORM TRADES ── */
+.form-section {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:16px; margin-bottom:16px;
+}
+.form-section h3 { font-size:15px; font-weight:700; margin-bottom:14px; }
+
+.form-row { margin-bottom:12px; }
+.form-row label { font-size:11px; color:var(--muted); font-weight:600; display:block; margin-bottom:6px; }
+
+.select-field {
+  width:100%; background:var(--bg);
+  border:1px solid var(--border); border-radius:10px;
+  padding:12px 14px; color:var(--text);
+  font-size:13px; outline:none; appearance:none;
+}
+
+.dir-selector { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.dir-btn {
+  padding:12px; border-radius:10px; border:1px solid var(--border);
+  background:var(--bg); color:var(--muted);
+  font-size:13px; font-weight:700; cursor:pointer;
+  transition:all 0.2s;
+}
+.dir-btn.active-long { background:rgba(0,212,170,0.15); color:var(--green); border-color:rgba(0,212,170,0.4); }
+.dir-btn.active-short { background:rgba(255,77,109,0.15); color:var(--red); border-color:rgba(255,77,109,0.4); }
+
+.close-trade-item {
+  background:var(--bg); border-radius:10px;
+  padding:12px 14px; margin-bottom:8px;
+  display:flex; justify-content:space-between; align-items:center;
+  cursor:pointer; border:1px solid var(--border);
+  transition:border-color 0.2s;
+}
+.close-trade-item.selected { border-color:var(--green); }
+.close-trade-item .info .sym { font-size:14px; font-weight:700; }
+.close-trade-item .info .detail { font-size:11px; color:var(--muted); margin-top:2px; }
+.close-trade-item .roe-val { font-size:14px; font-weight:700; }
+
+/* ── ALERT ── */
+.alert {
+  padding:12px 14px; border-radius:10px;
+  font-size:13px; margin-bottom:12px; line-height:1.5;
+}
+.alert-warn { background:rgba(243,156,18,0.1); border:1px solid rgba(243,156,18,0.3); color:var(--orange); }
+.alert-success { background:rgba(0,212,170,0.1); border:1px solid rgba(0,212,170,0.3); color:var(--green); }
+.alert-error { background:rgba(255,77,109,0.1); border:1px solid rgba(255,77,109,0.3); color:var(--red); }
+
+/* ── EMPTY STATE ── */
+.empty { text-align:center; padding:40px 20px; color:var(--muted); font-size:13px; }
+.empty .icon { font-size:40px; margin-bottom:12px; }
+
+/* UTILS */
+.up { color:var(--green); }
+.down { color:var(--red); }
+.neutral { color:var(--muted); }
+.mt8 { margin-top:8px; }
+.mt12 { margin-top:12px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE: DASHBOARD ═══════════ -->
+<div id="page-dashboard" class="page active">
+
+  <div class="header">
+    <div>
+      <h1>Crypto Dashboard</h1>
+      <span id="last-update">Actualizando...</span>
+    </div>
+    <div class="live-dot">LIVE</div>
+  </div>
+
+  <!-- SETUP API KEY -->
+  <div id="setup-section" class="setup-card" style="display:none">
+    <h3>🔑 Configuración inicial</h3>
+    <p>Introduce tu API Key de Groq para activar el análisis inteligente. Se guardará solo en tu dispositivo.</p>
+    <input type="password" class="input-field" id="groq-key-input" placeholder="gsk_...">
+    <button class="btn-primary" onclick="saveGroqKey()">Guardar API Key</button>
+  </div>
+
+  <!-- PRECIOS -->
+  <div class="prices-grid">
+    <div class="price-card">
+      <div class="sym">BTC</div>
+      <div class="prc" id="btc-price">—</div>
+      <div class="chg" id="btc-change">—</div>
+    </div>
+    <div class="price-card">
+      <div class="sym">ETH</div>
+      <div class="prc" id="eth-price">—</div>
+      <div class="chg" id="eth-change">—</div>
+    </div>
+    <div class="price-card">
+      <div class="sym">NEAR</div>
+      <div class="prc" id="near-price">—</div>
+      <div class="chg" id="near-change">—</div>
+    </div>
+    <div class="price-card">
+      <div class="sym">AVAX</div>
+      <div class="prc" id="avax-price">—</div>
+      <div class="chg" id="avax-change">—</div>
+    </div>
+  </div>
+
+  <!-- BOTÓN ANALIZAR -->
+  <button class="btn-primary" id="btn-analyze" onclick="runAnalysis()">
+    🔍 ANALIZAR AHORA
+  </button>
+
+  <!-- ANÁLISIS OUTPUT -->
+  <div id="analysis-output"></div>
+
+</div>
+
+<!-- ═══════════ PAGE: HISTORIAL ═══════════ -->
+<div id="page-historial" class="page">
+
+  <div class="header">
+    <div>
+      <h1>Historial</h1>
+      <span>Seguimiento de trades</span>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-grid" id="summary-grid"></div>
+
+  <!-- TRADES ACTIVOS -->
+  <div class="sec-title">Trades Activos</div>
+  <div id="active-trades-list"></div>
+
+  <div class="divider"></div>
+
+  <!-- TRADES CERRADOS -->
+  <div class="sec-title">Trades Cerrados</div>
+  <div id="closed-trades-list"></div>
+
+</div>
+
+<!-- ═══════════ PAGE: TRADES ═══════════ -->
+<div id="page-trades" class="page">
+
+  <div class="header">
+    <div>
+      <h1>Gestión</h1>
+      <span>Abrir y cerrar posiciones</span>
+    </div>
+  </div>
+
+  <!-- ABRIR TRADE -->
+  <div class="form-section">
+    <h3>➕ Abrir Trade</h3>
+
+    <div class="form-row">
+      <label>ACTIVO</label>
+      <select class="select-field" id="open-symbol">
+        <option value="BTC">Bitcoin (BTC)</option>
+        <option value="ETH">Ethereum (ETH)</option>
+        <option value="NEAR">NEAR Protocol (NEAR)</option>
+        <option value="AVAX">Avalanche (AVAX)</option>
+        <option value="OTHER">Otro</option>
+      </select>
+    </div>
+
+    <div id="other-symbol-row" class="form-row" style="display:none">
+      <label>SÍMBOLO</label>
+      <input type="text" class="input-field" id="open-symbol-other" placeholder="Ej: SOL, DOT...">
+    </div>
+
+    <div class="form-row">
+      <label>DIRECCIÓN</label>
+      <div class="dir-selector">
+        <button class="dir-btn active-long" id="btn-long" onclick="setDirection('LONG')">📈 LONG</button>
+        <button class="dir-btn" id="btn-short" onclick="setDirection('SHORT')">📉 SHORT</button>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>PRECIO ENTRADA</label>
+      <input type="number" class="input-field" id="open-entry" placeholder="0.00" step="any">
+    </div>
+
+    <div class="form-row">
+      <label>APALANCAMIENTO</label>
+      <select class="select-field" id="open-lev">
+        <option value="1">1x</option>
+        <option value="2">2x</option>
+        <option value="3" selected>3x</option>
+        <option value="4">4x</option>
+        <option value="5">5x</option>
+        <option value="7">7x</option>
+        <option value="10">10x</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>MARGEN (€)</label>
+      <input type="number" class="input-field" id="open-margin" placeholder="0.00" step="any">
+    </div>
+
+    <div class="form-row">
+      <label>STOP LOSS</label>
+      <input type="number" class="input-field" id="open-sl" placeholder="0.00" step="any">
+    </div>
+
+    <div class="form-row">
+      <label>NOTAS (opcional)</label>
+      <input type="text" class="input-field" id="open-notes" placeholder="Motivo de entrada...">
+    </div>
+
+    <button class="btn-primary" onclick="openTrade()" style="margin-bottom:0">
+      ➕ ABRIR TRADE
+    </button>
+  </div>
+
+  <!-- CERRAR TRADE -->
+  <div class="form-section">
+    <h3>❌ Cerrar Trade</h3>
+
+    <div id="trades-to-close"></div>
+
+    <div id="close-form" style="display:none">
+      <div class="form-row">
+        <label>PRECIO CIERRE</label>
+        <input type="number" class="input-field" id="close-price" placeholder="0.00" step="any">
+      </div>
+      <div class="form-row">
+        <label>% A CERRAR</label>
+        <select class="select-field" id="close-pct">
+          <option value="100">100% — Cierre total</option>
+          <option value="75">75%</option>
+          <option value="50">50%</option>
+          <option value="30">30% — TP parcial</option>
+          <option value="25">25%</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>MOTIVO</label>
+        <select class="select-field" id="close-reason">
+          <option value="TP1">TP1 — Primer objetivo</option>
+          <option value="TP2">TP2 — Segundo objetivo</option>
+          <option value="TP3">TP3 — Tercer objetivo</option>
+          <option value="SL">SL — Stop Loss</option>
+          <option value="MANUAL">Manual — Decisión propia</option>
+        </select>
+      </div>
+      <button class="btn-danger" onclick="closeTrade()">❌ CERRAR POSICIÓN</button>
+      <button class="btn-secondary" onclick="cancelClose()">Cancelar</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════ TABS BAR ═══════════ -->
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showTab('dashboard')">
+    <span class="icon">📊</span>Dashboard
+  </button>
+  <button class="tab-btn" onclick="showTab('historial')">
+    <span class="icon">📋</span>Historial
+  </button>
+  <button class="tab-btn" onclick="showTab('trades')">
+    <span class="icon">⚙️</span>Trades
+  </button>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+
+let prices = { BTC:0, ETH:0, NEAR:0, AVAX:0 };
+let changes = { BTC:0, ETH:0, NEAR:0, AVAX:0 };
+let selectedTradeToClose = null;
+let selectedDirection = 'LONG';
+let priceInterval = null;
+
+// ── TRADES DEFAULT (tus posiciones actuales) ──
+const defaultTrades = [
+  {
+    id:'btc-001',
+    symbol:'BTC',
+    direction:'LONG',
+    leverage:7,
+    entry:67372,
+    margin:169,
+    capitalLibre:190,
+    sl:67373,
+    tp1:72000, tp2:76500, tp3:88000,
+    openDate:'2026-02-12',
+    status:'OPEN',
+    realizedPnl:47.68,
+    notes:'Entrada en soporte histórico antiguo ATH 2021'
+  },
+  {
+    id:'eth-001',
+    symbol:'ETH',
+    direction:'LONG',
+    leverage:5,
+    entry:2049.90,
+    margin:87,
+    capitalLibre:177,
+    sl:1950,
+    tp1:2400, tp2:2650, tp3:3200,
+    openDate:'2026-02-12',
+    status:'OPEN',
+    realizedPnl:26.87,
+    notes:'Entrada en zona soporte histórico ciclo'
+  },
+  {
+    id:'near-001',
+    symbol:'NEAR',
+    direction:'LONG',
+    leverage:3,
+    entry:1.178,
+    margin:112,
+    capitalLibre:268,
+    sl:1.060,
+    tp1:1.600, tp2:1.900, tp3:3.000,
+    openDate:'2026-02-12',
+    status:'OPEN',
+    realizedPnl:-39.60,
+    notes:'Acumulación en mínimos de ciclo'
+  },
+  {
+    id:'avax-001',
+    symbol:'AVAX',
+    direction:'LONG',
+    leverage:3,
+    entry:8.368,
+    margin:106,
+    capitalLibre:106,
+    sl:7.000,
+    tp1:11.500, tp2:13.000, tp3:15.000,
+    openDate:'2026-02-12',
+    status:'OPEN',
+    realizedPnl:20.57,
+    notes:'Fondo de ciclo, zona histórica'
+  }
+];
+
+// ══════════════════════════════════════════
+// STORAGE
+// ══════════════════════════════════════════
+
+function getTrades() {
+  const stored = localStorage.getItem('crypto_trades');
+  if (!stored) {
+    localStorage.setItem('crypto_trades', JSON.stringify(defaultTrades));
+    return defaultTrades;
+  }
+  return JSON.parse(stored);
+}
+
+function saveTrades(trades) {
+  localStorage.setItem('crypto_trades', JSON.stringify(trades));
+}
+
+function getGroqKey() {
+  return localStorage.getItem('groq_api_key') || '';
+}
+
+function saveGroqKey() {
+  const key = document.getElementById('groq-key-input').value.trim();
+  if (!key.startsWith('gsk_')) {
+    showAlert('La API Key debe empezar por gsk_', 'error');
+    return;
+  }
+  localStorage.setItem('groq_api_key', key);
+  document.getElementById('setup-section').style.display = 'none';
+  showAlert('API Key guardada correctamente ✅', 'success');
+}
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+
+function showTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (tab === 'historial') renderHistorial();
+  if (tab === 'trades') renderTradesPage();
+}
+
+// ══════════════════════════════════════════
+// PRICES — BINANCE API
+// ══════════════════════════════════════════
+
+async function fetchPrices() {
+  try {
+    const symbols = ['BTCUSDT','ETHUSDT','NEARUSDT','AVAXUSDT'];
+    const url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=[' +
+      symbols.map(s => '"' + s + '"').join(',') + ']';
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    data.forEach(t => {
+      const sym = t.symbol.replace('USDT','');
+      prices[sym] = parseFloat(t.lastPrice);
+      changes[sym] = parseFloat(t.priceChangePercent);
+    });
+
+    updatePriceUI();
+    document.getElementById('last-update').textContent =
+      'Actualizado ' + new Date().toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+
+  } catch(e) {
+    // Fallback CoinGecko si Binance falla por CORS
+    try {
+      const res = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,near,avalanche-2&vs_currencies=usd&include_24hr_change=true'
+      );
+      const data = await res.json();
+      prices.BTC = data.bitcoin.usd;
+      prices.ETH = data.ethereum.usd;
+      prices.NEAR = data.near.usd;
+      prices.AVAX = data['avalanche-2'].usd;
+      changes.BTC = data.bitcoin.usd_24h_change;
+      changes.ETH = data.ethereum.usd_24h_change;
+      changes.NEAR = data.near.usd_24h_change;
+      changes.AVAX = data['avalanche-2'].usd_24h_change;
+      updatePriceUI();
+    } catch(e2) {
+      console.log('Error fetching prices:', e2);
+    }
+  }
+}
+
+function updatePriceUI() {
+  const fmt = (n, sym) => {
+    if (sym === 'BTC') return n.toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:0});
+    if (sym === 'ETH') return n.toFixed(2);
+    if (sym === 'NEAR') return n.toFixed(4);
+    if (sym === 'AVAX') return n.toFixed(3);
+    return n.toFixed(4);
+  };
+
+  ['BTC','ETH','NEAR','AVAX'].forEach(sym => {
+    const pEl = document.getElementById(sym.toLowerCase() + '-price');
+    const cEl = document.getElementById(sym.toLowerCase() + '-change');
+    if (pEl) pEl.textContent = prices[sym] ? fmt(prices[sym], sym) : '—';
+    if (cEl) {
+      const ch = changes[sym];
+      cEl.textContent = ch ? (ch > 0 ? '▲ +' : '▼ ') + ch.toFixed(2) + '%' : '—';
+      cEl.className = 'chg ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : 'neutral');
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+// ROE CALCULATION
+// ══════════════════════════════════════════
+
+function calcROE(trade) {
+  const currentPrice = prices[trade.symbol] || trade.entry;
+  const priceDiff = trade.direction === 'LONG'
+    ? (currentPrice - trade.entry) / trade.entry
+    : (trade.entry - currentPrice) / trade.entry;
+  return (priceDiff * trade.leverage * 100);
+}
+
+function calcUnrealizedPnl(trade) {
+  const roe = calcROE(trade) / 100;
+  return trade.margin * roe;
+}
+
+function distancePct(from, to) {
+  return ((to - from) / from * 100).toFixed(2);
+}
+
+// ══════════════════════════════════════════
+// GROQ ANALYSIS
+// ══════════════════════════════════════════
+
+async function runAnalysis() {
+  const key = getGroqKey();
+  if (!key) {
+    document.getElementById('setup-section').style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analizando...';
+
+  const trades = getTrades().filter(t => t.status === 'OPEN');
+
+  // Construir contexto
+  let tradeContext = '';
+  trades.forEach(t => {
+    const currentPrice = prices[t.symbol] || t.entry;
+    const roe = calcROE(t).toFixed(2);
+    const distSL = distancePct(currentPrice, t.sl);
+    const distTP1 = distancePct(currentPrice, t.tp1);
+    tradeContext += `
+${t.symbol}: ${t.direction} ${t.leverage}x
+  Entrada: ${t.entry} | Precio actual: ${currentPrice}
+  ROE: ${roe}% | SL: ${t.sl} (${distSL}%)
+  TP1: ${t.tp1} (${distTP1}%) | TP2: ${t.tp2} | TP3: ${t.tp3}
+  Margen: ${t.margin}€ | Capital libre: ${t.capitalLibre}€
+  P&L realizado previo: ${t.realizedPnl}€
+`;
+  });
+
+  const prompt = `Eres un trader profesional especializado en crypto. Analiza estas posiciones en contratos perpetuos Coin-M (donde las ganancias se acumulan en la propia moneda) de Bitget.
+
+PRECIOS EN TIEMPO REAL:
+BTC: ${prices.BTC} (${changes.BTC > 0 ? '+' : ''}${changes.BTC?.toFixed(2)}% 24h)
+ETH: ${prices.ETH} (${changes.ETH > 0 ? '+' : ''}${changes.ETH?.toFixed(2)}% 24h)
+NEAR: ${prices.NEAR} (${changes.NEAR > 0 ? '+' : ''}${changes.NEAR?.toFixed(2)}% 24h)
+AVAX: ${prices.AVAX} (${changes.AVAX > 0 ? '+' : ''}${changes.AVAX?.toFixed(2)}% 24h)
+
+POSICIONES ABIERTAS:
+${tradeContext}
+
+CONTEXTO DEL TRADER:
+- Mercado bajista actual, apostando por reversión alcista
+- Objetivo: acumular monedas en Coin-M aprovechando tendencia alcista futura
+- Capital total invertido ~474€, capital libre total ~741€
+- Swing trader, horizonte semanas-meses
+
+INSTRUCCIONES:
+Analiza PRIMERO BTC de forma independiente como indicador macro del mercado.
+Luego analiza las altcoins (ETH, NEAR, AVAX) teniendo en cuenta el contexto de BTC.
+
+Para CADA activo proporciona en este formato exacto:
+
+---[SÍMBOLO]---
+SITUACIÓN: [2-3 frases directas sobre el estado actual]
+RECOMENDACIÓN: [UNA de: MANTENER / AÑADIR / MOVER_SL / TP_PARCIAL / PRECAUCIÓN / CERRAR / CORTO]
+ACCIÓN: [qué hacer exactamente, con precios concretos]
+ENTRADA: [precio de entrada si recomiendas añadir o nuevo trade]
+SL: [stop loss exacto]
+TP1: [primer objetivo]
+TP2: [segundo objetivo]  
+TP3: [tercer objetivo si aplica]
+TAMAÑO: [% del capital libre a usar y por qué]
+APALANCAMIENTO: [recomendado]
+RIESGO: [AGRESIVO / MODERADO / CAUTO y por qué en una frase]
+
+Sé directo, conciso y usa lenguaje de trader. Sin rodeos. Precio siempre exacto.`;
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.3
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      showAlert('Error API: ' + data.error.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '🔍 ANALIZAR AHORA';
+      return;
+    }
+
+    const analysis = data.choices[0].message.content;
+    renderAnalysis(analysis, trades);
+
+    // Guardar en historial
+    const history = JSON.parse(localStorage.getItem('analysis_history') || '[]');
+    history.unshift({
+      date: new Date().toISOString(),
+      prices: {...prices},
+      analysis: analysis
+    });
+    if (history.length > 20) history.pop();
+    localStorage.setItem('analysis_history', JSON.stringify(history));
+
+  } catch(e) {
+    showAlert('Error de conexión. Comprueba tu API Key.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '🔍 ANALIZAR AHORA';
+}
+
+function renderAnalysis(text, trades) {
+  const output = document.getElementById('analysis-output');
+
+  // Parsear secciones por símbolo
+  const sections = text.split(/---(\w+)---/).filter(s => s.trim());
+  let html = '';
+
+  // Contexto BTC primero
+  const btcChange = changes.BTC || 0;
+  const btcCtxClass = btcChange > 2 ? 'up' : btcChange < -2 ? 'down' : 'neutral';
+  const btcCtxText = btcChange > 2 ? '🟢 ALCISTA' : btcChange < -2 ? '🔴 BAJISTA' : '🟡 NEUTRAL';
+
+  html += `
+    <div class="sec-title">Bitcoin</div>
+  `;
+
+  // Renderizar cada sección
+  let currentSym = null;
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i].trim();
+    if (['BTC','ETH','NEAR','AVAX'].includes(s)) {
+      currentSym = s;
+      continue;
+    }
+    if (currentSym) {
+      const trade = trades.find(t => t.symbol === currentSym);
+      html += renderTradeAnalysis(currentSym, s, trade);
+      if (currentSym === 'BTC' && sections.some(s => ['ETH','NEAR','AVAX'].includes(s))) {
+        html += `
+          <div class="divider"></div>
+          <div class="sec-title">Altcoins</div>
+          <div class="btc-ctx">
+            <div>
+              <div class="lbl">Contexto BTC</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">Condiciona las altcoins</div>
+            </div>
+            <div class="val ${btcCtxClass}">${btcCtxText}</div>
+          </div>
+        `;
+      }
+      currentSym = null;
+    }
+  }
+
+  // Si el parseo no funciona perfectamente, mostrar texto raw formateado
+  if (!html.includes('pos-card')) {
+    html = renderRawAnalysis(text, trades);
+  }
+
+  output.innerHTML = html;
+}
+
+function renderTradeAnalysis(sym, text, trade) {
+  if (!trade) return '';
+
+  const currentPrice = prices[sym] || trade.entry;
+  const roe = calcROE(trade);
+  const roeStr = (roe >= 0 ? '+' : '') + roe.toFixed(2) + '%';
+  const unrealizedPnl = calcUnrealizedPnl(trade);
+
+  // Detectar recomendación
+  const recMatch = text.match(/RECOMENDACI[OÓ]N:\s*([A-Z_]+)/i);
+  const rec = recMatch ? recMatch[1].toUpperCase() : 'MANTENER';
+
+  // Detectar riesgo
+  const riskMatch = text.match(/RIESGO:\s*(AGRESIVO|MODERADO|CAUTO)/i);
+  const risk = riskMatch ? riskMatch[1].toUpperCase() : 'MODERADO';
+
+  // Colores
+  const recColors = {
+    'MANTENER': { cls:'rec-mantener', color:'var(--green)', icon:'✅' },
+    'AÑADIR': { cls:'rec-anadir', color:'var(--blue)', icon:'🎯' },
+    'MOVER_SL': { cls:'rec-mantener', color:'var(--green)', icon:'⚙️' },
+    'TP_PARCIAL': { cls:'rec-tp', color:'var(--yellow)', icon:'💰' },
+    'PRECAUCIÓN': { cls:'rec-precaucion', color:'var(--orange)', icon:'⚠️' },
+    'CERRAR': { cls:'rec-cerrar', color:'var(--red)', icon:'🚨' },
+    'CORTO': { cls:'rec-corto', color:'var(--purple)', icon:'📉' }
+  };
+  const recStyle = recColors[rec] || recColors['MANTENER'];
+
+  const riskBadges = {
+    'AGRESIVO': 'risk-agr',
+    'MODERADO': 'risk-mod',
+    'CAUTO': 'risk-cau'
+  };
+  const riskIcons = { 'AGRESIVO':'🔥', 'MODERADO':'⚡', 'CAUTO':'🛡' };
+
+  const distSL = parseFloat(distancePct(currentPrice, trade.sl));
+  const distTP1 = parseFloat(distancePct(currentPrice, trade.tp1));
+  const distTP2 = parseFloat(distancePct(currentPrice, trade.tp2));
+
+  // Extraer acción del texto
+  const accionMatch = text.match(/ACCI[OÓ]N:\s*([^\n]+)/i);
+  const accion = accionMatch ? accionMatch[1] : '';
+
+  const entradaMatch = text.match(/ENTRADA:\s*([^\n]+)/i);
+  const slMatch = text.match(/SL:\s*([^\n]+)/i);
+  const tp1Match = text.match(/TP1:\s*([^\n]+)/i);
+  const tp2Match = text.match(/TP2:\s*([^\n]+)/i);
+  const tp3Match = text.match(/TP3:\s*([^\n]+)/i);
+  const tamanoMatch = text.match(/TAMA[NÑ]O:\s*([^\n]+)/i);
+  const levMatch = text.match(/APALANCAMIENTO:\s*([^\n]+)/i);
+  const situacionMatch = text.match(/SITUACI[OÓ]N:\s*([^\n]+(?:\n(?![A-Z_]+:)[^\n]+)*)/i);
+
+  let detailsHTML = '';
+  if (entradaMatch && entradaMatch[1].trim() !== '-') {
+    detailsHTML += `<div class="rec-detail-row"><span class="k">Entrada</span><span class="v" style="color:var(--blue)">${entradaMatch[1].trim()}</span></div>`;
+  }
+  if (slMatch) detailsHTML += `<div class="rec-detail-row"><span class="k">SL</span><span class="v" style="color:var(--red)">${slMatch[1].trim()}</span></div>`;
+  if (tp1Match) detailsHTML += `<div class="rec-detail-row"><span class="k">TP1</span><span class="v">${tp1Match[1].trim()}</span></div>`;
+  if (tp2Match) detailsHTML += `<div class="rec-detail-row"><span class="k">TP2</span><span class="v">${tp2Match[1].trim()}</span></div>`;
+  if (tp3Match && !tp3Match[1].includes('aplica')) detailsHTML += `<div class="rec-detail-row"><span class="k">TP3</span><span class="v">${tp3Match[1].trim()}</span></div>`;
+  if (tamanoMatch) detailsHTML += `<div class="rec-detail-row"><span class="k">Tamaño</span><span class="v">${tamanoMatch[1].trim()}</span></div>`;
+  if (levMatch) detailsHTML += `<div class="rec-detail-row"><span class="k">Apalancamiento</span><span class="v">${levMatch[1].trim()}</span></div>`;
+
+  return `
+    <div class="pos-card">
+      <div class="pos-header">
+        <div class="pos-sym">
+          <span class="name">${sym}</span>
+          <span class="badge badge-${trade.direction.toLowerCase()}">${trade.direction}</span>
+          <span class="badge badge-lev">${trade.leverage}x</span>
+        </div>
+        <div class="roe ${roe >= 0 ? 'up' : 'down'}">${roeStr}</div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat">
+          <div class="lbl">ENTRADA</div>
+          <div class="val">${trade.entry.toLocaleString()}</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">ACTUAL</div>
+          <div class="val">${currentPrice.toLocaleString()}</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">P&L NO REAL.</div>
+          <div class="val ${unrealizedPnl >= 0 ? 'up' : 'down'}">${unrealizedPnl >= 0 ? '+' : ''}${unrealizedPnl.toFixed(0)}€</div>
+        </div>
+      </div>
+
+      <div class="levels">
+        <div class="level-row">
+          <span class="lbl">🔴 SL</span>
+          <span class="prc">${trade.sl.toLocaleString()}</span>
+          <span class="dist ${distSL >= 0 ? 'up' : 'down'}">${distSL > 0 ? '+' : ''}${distSL}%</span>
+        </div>
+        <div class="level-row">
+          <span class="lbl">🎯 TP1</span>
+          <span class="prc">${trade.tp1.toLocaleString()}</span>
+          <span class="dist ${distTP1 >= 0 ? 'up' : 'down'}">${distTP1 > 0 ? '+' : ''}${distTP1}%</span>
+        </div>
+        <div class="level-row">
+          <span class="lbl">🎯 TP2</span>
+          <span class="prc">${trade.tp2.toLocaleString()}</span>
+          <span class="dist ${distTP2 >= 0 ? 'up' : 'down'}">${distTP2 > 0 ? '+' : ''}${distTP2}%</span>
+        </div>
+      </div>
+
+      <div class="capital-row">
+        <div class="cap-item">
+          <div class="lbl">MARGEN USADO</div>
+          <div class="val">≈ ${trade.margin}€</div>
+        </div>
+        <div class="cap-item">
+          <div class="lbl">CAPITAL LIBRE</div>
+          <div class="val">≈ ${trade.capitalLibre}€</div>
+        </div>
+      </div>
+
+      <div class="rec-card ${recStyle.cls}">
+        <div class="rec-header">
+          <span style="font-size:16px">${recStyle.icon}</span>
+          <span class="rec-tag" style="color:${recStyle.color}">${rec.replace('_',' ')}</span>
+        </div>
+        ${situacionMatch ? `<div class="rec-text">${situacionMatch[1].trim()}</div>` : ''}
+        ${accion ? `<div class="rec-text mt8" style="font-weight:600">${accion}</div>` : ''}
+        ${detailsHTML ? `<div class="rec-details">${detailsHTML}</div>` : ''}
+        <div class="risk-badge ${riskBadges[risk] || 'risk-mod'}">${riskIcons[risk] || '⚡'} RIESGO ${risk}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderRawAnalysis(text, trades) {
+  // Fallback: mostrar el análisis en cards por activo
+  const sections = text.split(/\n(?=---|\*\*BTC|\*\*ETH|\*\*NEAR|\*\*AVAX)/);
+  let html = '<div class="sec-title">Análisis Completo</div>';
+
+  sections.forEach(section => {
+    if (section.trim()) {
+      html += `
+        <div class="pos-card">
+          <div class="rec-card rec-mantener">
+            <div class="rec-text" style="white-space:pre-wrap;font-size:12px;line-height:1.7">${section.trim()}</div>
+          </div>
+        </div>
+      `;
+    }
+  });
+  return html;
+}
+
+// ══════════════════════════════════════════
+// HISTORIAL
+// ══════════════════════════════════════════
+
+function renderHistorial() {
+  const trades = getTrades();
+  const open = trades.filter(t => t.status === 'OPEN');
+  const closed = trades.filter(t => t.status !== 'OPEN');
+
+  // Summary
+  let totalInvested = 0;
+  let totalUnrealized = 0;
+  let totalRealized = 0;
+  let bestROE = -Infinity, worstROE = Infinity;
+  let bestSym = '', worstSym = '';
+
+  open.forEach(t => {
+    totalInvested += t.margin;
+    const unreal = calcUnrealizedPnl(t);
+    const roe = calcROE(t);
+    totalUnrealized += unreal;
+    totalRealized += t.realizedPnl || 0;
+    if (roe > bestROE) { bestROE = roe; bestSym = t.symbol; }
+    if (roe < worstROE) { worstROE = roe; worstSym = t.symbol; }
+  });
+
+  closed.forEach(t => {
+    totalRealized += t.finalPnl || 0;
+  });
+
+  const totalPnl = totalUnrealized + totalRealized;
+  const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested * 100) : 0;
+
+  document.getElementById('summary-grid').innerHTML = `
+    <div class="summary-card">
+      <div class="lbl">CAPITAL INVERTIDO</div>
+      <div class="val">${totalInvested.toFixed(0)}€</div>
+      <div class="sub">${open.length} trades activos</div>
+    </div>
+    <div class="summary-card">
+      <div class="lbl">P&L TOTAL</div>
+      <div class="val ${totalPnl >= 0 ? 'up' : 'down'}">${totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(0)}€</div>
+      <div class="sub ${totalPnlPct >= 0 ? 'up' : 'down'}">${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%</div>
+    </div>
+    <div class="summary-card">
+      <div class="lbl">NO REALIZADO</div>
+      <div class="val ${totalUnrealized >= 0 ? 'up' : 'down'}">${totalUnrealized >= 0 ? '+' : ''}${totalUnrealized.toFixed(0)}€</div>
+      <div class="sub">En posiciones abiertas</div>
+    </div>
+    <div class="summary-card">
+      <div class="lbl">REALIZADO</div>
+      <div class="val ${totalRealized >= 0 ? 'up' : 'down'}">${totalRealized >= 0 ? '+' : ''}${totalRealized.toFixed(0)}€</div>
+      <div class="sub">TPs + trades cerrados</div>
+    </div>
+  `;
+
+  // Trades activos
+  let activeHTML = '';
+  if (open.length === 0) {
+    activeHTML = '<div class="empty"><div class="icon">📭</div>No hay trades activos</div>';
+  } else {
+    open.forEach(t => {
+      const roe = calcROE(t);
+      const unreal = calcUnrealizedPnl(t);
+      const currentPrice = prices[t.symbol] || t.entry;
+      const daysSince = Math.floor((new Date() - new Date(t.openDate)) / 86400000);
+
+      activeHTML += `
+        <div class="trade-history-item">
+          <div class="th-header">
+            <div>
+              <div class="th-sym">${t.symbol} <span style="font-size:12px;color:var(--muted)">${t.direction} ${t.leverage}x</span></div>
+            </div>
+            <div class="th-result ${roe >= 0 ? 'up' : 'down'}">${roe >= 0 ? '+' : ''}${roe.toFixed(2)}%</div>
+          </div>
+          <div class="th-details">
+            <div class="th-detail">Entrada: <span>${t.entry.toLocaleString()}</span></div>
+            <div class="th-detail">Actual: <span>${currentPrice.toLocaleString()}</span></div>
+            <div class="th-detail">SL: <span style="color:var(--red)">${t.sl.toLocaleString()}</span></div>
+            <div class="th-detail">TP1: <span style="color:var(--green)">${t.tp1.toLocaleString()}</span></div>
+            <div class="th-detail">No realizado: <span class="${unreal >= 0 ? 'up' : 'down'}">${unreal >= 0 ? '+' : ''}${unreal.toFixed(0)}€</span></div>
+            <div class="th-detail">Realizado: <span class="${(t.realizedPnl||0) >= 0 ? 'up' : 'down'}">${(t.realizedPnl||0) >= 0 ? '+' : ''}${(t.realizedPnl||0).toFixed(0)}€</span></div>
+            <div class="th-detail">Margen: <span>${t.margin}€</span></div>
+            <div class="th-detail">Días: <span>${daysSince}d</span></div>
+          </div>
+          <span class="th-badge th-open">● EN CURSO</span>
+          ${t.notes ? `<div style="font-size:11px;color:var(--muted);margin-top:8px">${t.notes}</div>` : ''}
+        </div>
+      `;
+    });
+  }
+  document.getElementById('active-trades-list').innerHTML = activeHTML;
+
+  // Trades cerrados
+  let closedHTML = '';
+  if (closed.length === 0) {
+    closedHTML = '<div class="empty"><div class="icon">📂</div>No hay trades cerrados</div>';
+  } else {
+    closed.forEach(t => {
+      const pnl = t.finalPnl || 0;
+      const badgeClass = t.closeReason === 'SL' ? 'th-sl' : 'th-closed';
+      const badgeText = t.closeReason === 'SL' ? '✕ SL SALTADO' : '✓ CERRADO';
+
+      closedHTML += `
+        <div class="trade-history-item">
+          <div class="th-header">
+            <div>
+              <div class="th-sym">${t.symbol} <span style="font-size:12px;color:var(--muted)">${t.direction} ${t.leverage}x</span></div>
+            </div>
+            <div class="th-result ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(0)}€</div>
+          </div>
+          <div class="th-details">
+            <div class="th-detail">Entrada: <span>${t.entry.toLocaleString()}</span></div>
+            <div class="th-detail">Cierre: <span>${(t.closePrice||0).toLocaleString()}</span></div>
+            <div class="th-detail">ROE final: <span class="${(t.finalROE||0) >= 0 ? 'up' : 'down'}">${(t.finalROE||0) >= 0 ? '+' : ''}${(t.finalROE||0).toFixed(2)}%</span></div>
+            <div class="th-detail">Motivo: <span>${t.closeReason || '—'}</span></div>
+            <div class="th-detail">Apertura: <span>${t.openDate}</span></div>
+            <div class="th-detail">Cierre: <span>${t.closeDate || '—'}</span></div>
+          </div>
+          <span class="th-badge ${badgeClass}">${badgeText}</span>
+        </div>
+      `;
+    });
+  }
+  document.getElementById('closed-trades-list').innerHTML = closedHTML;
+}
+
+// ══════════════════════════════════════════
+// TRADES PAGE
+// ══════════════════════════════════════════
+
+function renderTradesPage() {
+  const trades = getTrades().filter(t => t.status === 'OPEN');
+  const container = document.getElementById('trades-to-close');
+
+  if (trades.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">📭</div>No hay trades activos</div>';
+    return;
+  }
+
+  let html = '<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Selecciona el trade a cerrar:</p>';
+  trades.forEach(t => {
+    const roe = calcROE(t);
+    html += `
+      <div class="close-trade-item" id="cti-${t.id}" onclick="selectTradeToClose('${t.id}')">
+        <div class="info">
+          <div class="sym">${t.symbol} · ${t.direction} ${t.leverage}x</div>
+          <div class="detail">Entrada: ${t.entry.toLocaleString()} · Margen: ${t.margin}€</div>
+        </div>
+        <div class="roe-val ${roe >= 0 ? 'up' : 'down'}">${roe >= 0 ? '+' : ''}${roe.toFixed(1)}%</div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  document.getElementById('close-form').style.display = 'none';
+  selectedTradeToClose = null;
+
+  // Symbol change
+  document.getElementById('open-symbol').addEventListener('change', function() {
+    document.getElementById('other-symbol-row').style.display =
+      this.value === 'OTHER' ? 'block' : 'none';
+  });
+}
+
+function selectTradeToClose(id) {
+  selectedTradeToClose = id;
+  document.querySelectorAll('.close-trade-item').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('cti-' + id);
+  if (el) el.classList.add('selected');
+  document.getElementById('close-form').style.display = 'block';
+
+  // Prerellenar precio actual
+  const trades = getTrades();
+  const trade = trades.find(t => t.id === id);
+  if (trade && prices[trade.symbol]) {
+    document.getElementById('close-price').value = prices[trade.symbol].toFixed(trade.symbol === 'BTC' ? 0 : 4);
+  }
+}
+
+function cancelClose() {
+  selectedTradeToClose = null;
+  document.getElementById('close-form').style.display = 'none';
+  document.querySelectorAll('.close-trade-item').forEach(el => el.classList.remove('selected'));
+}
+
+function setDirection(dir) {
+  selectedDirection = dir;
+  document.getElementById('btn-long').className = 'dir-btn' + (dir === 'LONG' ? ' active-long' : '');
+  document.getElementById('btn-short').className = 'dir-btn' + (dir === 'SHORT' ? ' active-short' : '');
+}
+
+function openTrade() {
+  const symSelect = document.getElementById('open-symbol').value;
+  const symbol = symSelect === 'OTHER'
+    ? document.getElementById('open-symbol-other').value.toUpperCase().trim()
+    : symSelect;
+
+  const entry = parseFloat(document.getElementById('open-entry').value);
+  const lev = parseInt(document.getElementById('open-lev').value);
+  const margin = parseFloat(document.getElementById('open-margin').value);
+  const sl = parseFloat(document.getElementById('open-sl').value);
+  const notes = document.getElementById('open-notes').value;
+
+  if (!symbol || !entry || !lev || !margin || !sl) {
+    showAlert('Rellena todos los campos obligatorios', 'error');
+    return;
+  }
+
+  const trades = getTrades();
+  const newTrade = {
+    id: symbol.toLowerCase() + '-' + Date.now(),
+    symbol,
+    direction: selectedDirection,
+    leverage: lev,
+    entry,
+    margin,
+    capitalLibre: 0,
+    sl,
+    tp1: entry * (selectedDirection === 'LONG' ? 1.15 : 0.85),
+    tp2: entry * (selectedDirection === 'LONG' ? 1.30 : 0.70),
+    tp3: entry * (selectedDirection === 'LONG' ? 1.50 : 0.50),
+    openDate: new Date().toISOString().split('T')[0],
+    status: 'OPEN',
+    realizedPnl: 0,
+    notes
+  };
+
+  trades.push(newTrade);
+  saveTrades(trades);
+
+  // Reset form
+  document.getElementById('open-entry').value = '';
+  document.getElementById('open-margin').value = '';
+  document.getElementById('open-sl').value = '';
+  document.getElementById('open-notes').value = '';
+
+  showAlert(`Trade ${symbol} ${selectedDirection} abierto ✅`, 'success');
+  renderTradesPage();
+}
+
+function closeTrade() {
+  if (!selectedTradeToClose) return;
+
+  const closePrice = parseFloat(document.getElementById('close-price').value);
+  const closePct = parseInt(document.getElementById('close-pct').value);
+  const reason = document.getElementById('close-reason').value;
+
+  if (!closePrice) {
+    showAlert('Introduce el precio de cierre', 'error');
+    return;
+  }
+
+  const trades = getTrades();
+  const idx = trades.findIndex(t => t.id === selectedTradeToClose);
+  if (idx === -1) return;
+
+  const trade = trades[idx];
+  const roe = calcROE(trade);
+  const pnl = trade.margin * (roe / 100) * (closePct / 100);
+
+  if (closePct === 100) {
+    // Cierre total
+    trades[idx] = {
+      ...trade,
+      status: 'CLOSED',
+      closePrice,
+      closeDate: new Date().toISOString().split('T')[0],
+      closeReason: reason,
+      finalROE: roe,
+      finalPnl: pnl + (trade.realizedPnl || 0)
+    };
+  } else {
+    // Cierre parcial — actualizar margen y registrar ganancia
+    trades[idx].margin = trade.margin * (1 - closePct / 100);
+    trades[idx].realizedPnl = (trade.realizedPnl || 0) + pnl;
+  }
+
+  saveTrades(trades);
+  showAlert(`${closePct === 100 ? 'Trade cerrado' : 'TP parcial registrado'} ✅ P&L: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}€`, 'success');
+  cancelClose();
+  renderTradesPage();
+}
+
+// ══════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════
+
+function showAlert(msg, type) {
+  const existing = document.getElementById('toast-alert');
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.id = 'toast-alert';
+  el.style.cssText = `
+    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+    max-width:380px;width:90%;z-index:999;
+    padding:12px 16px;border-radius:12px;
+    font-size:13px;font-weight:600;text-align:center;
+    animation:fadeIn 0.3s ease;
+  `;
+
+  const styles = {
+    error: 'background:rgba(255,77,109,0.95);color:#fff;',
+    success: 'background:rgba(0,212,170,0.95);color:#000;',
+    warn: 'background:rgba(243,156,18,0.95);color:#000;'
+  };
+  el.style.cssText += styles[type] || styles.warn;
+  el.textContent = msg;
+
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 3000);
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Comprobar API key
+  if (!getGroqKey()) {
+    document.getElementById('setup-section').style.display = 'block';
+  }
+
+  // Cargar precios inmediatamente
+  fetchPrices();
+
+  // Actualizar cada 30 segundos
+  priceInterval = setInterval(fetchPrices, 30000);
+
+  // Init trades si no existen
+  getTrades();
+});
+
+// Estilo fadeIn
+const style = document.createElement('style');
+style.textContent = '@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+document.head.appendChild(style);
+</script>
+</body>
+</html>
