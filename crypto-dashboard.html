@@ -597,6 +597,7 @@ body {
 
 let prices = { BTC:0, ETH:0, NEAR:0, AVAX:0 };
 let changes = { BTC:0, ETH:0, NEAR:0, AVAX:0 };
+let technicalData = {};  // Datos técnicos calculados desde velas reales
 let selectedTradeToClose = null;
 let selectedDirection = 'LONG';
 let priceInterval = null;
@@ -783,19 +784,187 @@ function updatePriceUI() {
 
 function calcROE(trade) {
   const currentPrice = prices[trade.symbol] || trade.entry;
-  const priceDiff = trade.direction === 'LONG'
-    ? (currentPrice - trade.entry) / trade.entry
-    : (trade.entry - currentPrice) / trade.entry;
-  return (priceDiff * trade.leverage * 100);
+  const entry = trade.entry;
+  const lev = trade.leverage;
+  // Fórmula exacta Coin-M perpetuos
+  // ROE = (1/entrada - 1/precio_actual) * precio_actual * leverage * 100  [LONG]
+  // ROE = (1/precio_actual - 1/entrada) * precio_actual * leverage * 100  [SHORT]
+  if (trade.direction === 'LONG') {
+    return ((1/entry - 1/currentPrice) * currentPrice * lev * 100);
+  } else {
+    return ((1/currentPrice - 1/entry) * currentPrice * lev * 100);
+  }
 }
 
 function calcUnrealizedPnl(trade) {
+  // P&L no realizado en EUR aproximado
+  // En Coin-M: P&L en moneda = tamaño_contratos * (1/entrada - 1/precio_actual)
+  const currentPrice = prices[trade.symbol] || trade.entry;
   const roe = calcROE(trade) / 100;
   return trade.margin * roe;
 }
 
 function distancePct(from, to) {
   return ((to - from) / from * 100).toFixed(2);
+}
+
+// ══════════════════════════════════════════
+// DATOS TÉCNICOS DESDE VELAS REALES
+// ══════════════════════════════════════════
+
+async function fetchTechnicalData(symbol) {
+  try {
+    const binanceSym = symbol === 'BTC' ? 'BTCUSDT' :
+                       symbol === 'ETH' ? 'ETHUSDT' :
+                       symbol === 'NEAR' ? 'NEARUSDT' : 'AVAXUSDT';
+
+    // Descargar velas 4H (últimas 100)
+    const [r4h, r1w, r3d] = await Promise.all([
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=4h&limit=100`),
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=1w&limit=52`),
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=3d&limit=40`)
+    ]);
+
+    const k4h = await r4h.json();
+    const k1w = await r1w.json();
+    const k3d = await r3d.json();
+
+    // Extraer closes y volúmenes
+    const closes4h = k4h.map(k => parseFloat(k[4]));
+    const vols4h   = k4h.map(k => parseFloat(k[5]));
+    const closes1w = k1w.map(k => parseFloat(k[4]));
+    const closes3d = k3d.map(k => parseFloat(k[4]));
+    const highs4h  = k4h.map(k => parseFloat(k[2]));
+    const lows4h   = k4h.map(k => parseFloat(k[3]));
+
+    // ── EMA ──
+    function ema(data, period) {
+      const k = 2 / (period + 1);
+      let emaVal = data[0];
+      for (let i = 1; i < data.length; i++) {
+        emaVal = data[i] * k + emaVal * (1 - k);
+      }
+      return emaVal;
+    }
+
+    // ── RSI ──
+    function rsi(data, period = 14) {
+      let gains = 0, losses = 0;
+      for (let i = 1; i <= period; i++) {
+        const diff = data[data.length - i] - data[data.length - i - 1];
+        if (diff > 0) gains += diff; else losses -= diff;
+      }
+      const rs = gains / losses;
+      return 100 - (100 / (1 + rs));
+    }
+
+    // ── MACD ──
+    function macdCalc(data) {
+      const fast = ema(data, 12);
+      const slow = ema(data, 26);
+      const line = fast - slow;
+      // Signal: EMA9 del MACD (aproximación)
+      const macdSeries = [];
+      for (let i = 25; i < data.length; i++) {
+        const f = ema(data.slice(0, i+1), 12);
+        const s = ema(data.slice(0, i+1), 26);
+        macdSeries.push(f - s);
+      }
+      const signal = ema(macdSeries, 9);
+      const hist = line - signal;
+      const prevHist = macdSeries[macdSeries.length-2] - ema(macdSeries.slice(0,-1), 9);
+      return { line, signal, hist, histSubiendo: hist > prevHist };
+    }
+
+    // ── SOPORTE Y RESISTENCIA (últimos pivots 4H) ──
+    function findLevels(highs, lows, closes, n = 20) {
+      const recent = closes.slice(-n);
+      const recentH = highs.slice(-n);
+      const recentL = lows.slice(-n);
+      const max = Math.max(...recentH);
+      const min = Math.min(...recentL);
+      const currentPrice = closes[closes.length-1];
+
+      // Resistencias: máximos recientes por encima del precio
+      const resistances = recentH
+        .filter(h => h > currentPrice * 1.005)
+        .sort((a,b) => a-b)
+        .slice(0, 3);
+
+      // Soportes: mínimos recientes por debajo del precio
+      const supports = recentL
+        .filter(l => l < currentPrice * 0.995)
+        .sort((a,b) => b-a)
+        .slice(0, 3);
+
+      return { resistances, supports, rangeMax: max, rangeMin: min };
+    }
+
+    // ── VOLUMEN RELATIVO ──
+    const volAvg = vols4h.slice(-20).reduce((a,b) => a+b, 0) / 20;
+    const volActual = vols4h[vols4h.length-1];
+    const volRelativo = (volActual / volAvg).toFixed(2);
+
+    // ── CALCULAR TODO ──
+    const ema21_4h  = ema(closes4h, 21);
+    const ema50_4h  = ema(closes4h, 50);
+    const ema200_4h = ema(closes4h, 100); // usamos 100 por limite de datos
+    const ema21_1w  = ema(closes1w, 21);
+    const ema50_1w  = ema(closes1w, 50);
+    const ema21_3d  = ema(closes3d, 21);
+    const ema50_3d  = ema(closes3d, 50);
+
+    const rsi4h = rsi(closes4h, 14);
+    const rsi1w = rsi(closes1w, 14);
+    const rsi3d = rsi(closes3d, 14);
+
+    const macd4h = macdCalc(closes4h);
+    const macd3d = macdCalc(closes3d);
+
+    const currentPrice = closes4h[closes4h.length-1];
+    const levels = findLevels(highs4h, lows4h, closes4h);
+
+    return {
+      symbol,
+      currentPrice,
+      // EMAs
+      ema21_4h: ema21_4h.toFixed(2),
+      ema50_4h: ema50_4h.toFixed(2),
+      ema200_4h: ema200_4h.toFixed(2),
+      ema21_1w: ema21_1w.toFixed(2),
+      ema50_1w: ema50_1w.toFixed(2),
+      ema21_3d: ema21_3d.toFixed(2),
+      ema50_3d: ema50_3d.toFixed(2),
+      // RSI
+      rsi4h: rsi4h.toFixed(1),
+      rsi1w: rsi1w.toFixed(1),
+      rsi3d: rsi3d.toFixed(1),
+      // MACD 4H
+      macd4h_line: macd4h.line.toFixed(4),
+      macd4h_signal: macd4h.signal.toFixed(4),
+      macd4h_hist: macd4h.hist.toFixed(4),
+      macd4h_subiendo: macd4h.histSubiendo,
+      // MACD 3D
+      macd3d_alcista: macd3d.line > macd3d.signal,
+      macd3d_hist: macd3d.hist.toFixed(4),
+      // Soportes y resistencias reales
+      soporte1: levels.supports[0]?.toFixed(2) || 'N/A',
+      soporte2: levels.supports[1]?.toFixed(2) || 'N/A',
+      resistencia1: levels.resistances[0]?.toFixed(2) || 'N/A',
+      resistencia2: levels.resistances[1]?.toFixed(2) || 'N/A',
+      // Volumen
+      volRelativo,
+      volAlto: parseFloat(volRelativo) > 1.3,
+      // Tendencias
+      tendencia4h: currentPrice > ema21_4h ? 'ALCISTA' : 'BAJISTA',
+      tendencia1w: currentPrice > ema50_1w ? 'ALCISTA' : 'BAJISTA',
+      precioBajoEMA21_4h: currentPrice < ema21_4h,
+      precioBajoEMA50_4h: currentPrice < ema50_4h,
+    };
+  } catch(e) {
+    console.log('Error técnico', e);
+    return null;
+  }
 }
 
 // ══════════════════════════════════════════
@@ -815,141 +984,122 @@ async function runAnalysis() {
 
   const trades = getTrades().filter(t => t.status === 'OPEN');
 
-  // Construir contexto
+  // ── Descargar datos técnicos reales para cada activo ──
+  btn.innerHTML = '<div class="spinner"></div> Descargando datos técnicos...';
+  const symbols = [...new Set(trades.map(t => t.symbol))];
+  const techResults = await Promise.all(symbols.map(s => fetchTechnicalData(s)));
+  const techMap = {};
+  techResults.forEach(r => { if (r) techMap[r.symbol] = r; });
+
+  // ── Construir contexto técnico detallado ──
   let tradeContext = '';
   trades.forEach(t => {
     const currentPrice = prices[t.symbol] || t.entry;
     const roe = calcROE(t).toFixed(2);
     const distSL = distancePct(currentPrice, t.sl);
     const distTP1 = distancePct(currentPrice, t.tp1);
+    const distTP2 = distancePct(currentPrice, t.tp2);
+    const tech = techMap[t.symbol];
+
     tradeContext += `
-${t.symbol}: ${t.direction} ${t.leverage}x
-  Entrada: ${t.entry} | Precio actual: ${currentPrice}
-  ROE: ${roe}% | SL: ${t.sl} (${distSL}%)
-  TP1: ${t.tp1} (${distTP1}%) | TP2: ${t.tp2} | TP3: ${t.tp3}
-  Margen: ${t.margin}€ | Capital libre: ${t.capitalLibre}€
-  P&L realizado previo: ${t.realizedPnl}€
+═══ ${t.symbol} ═══
+POSICIÓN: ${t.direction} ${t.leverage}x | Entrada: ${t.entry} | Precio actual: ${currentPrice}
+ROE (Coin-M): ${roe}% | SL: ${t.sl} (${distSL}% desde precio actual)
+TP1: ${t.tp1} (${distTP1}%) | TP2: ${t.tp2} (${distTP2}%) | TP3: ${t.tp3}
+Margen: ${t.margin}€ | Capital libre: ${t.capitalLibre}€
+TP1 superado: ${parseFloat(currentPrice) > t.tp1 ? 'SÍ — ya se debería haber recogido parcial' : 'NO — precio aún no ha llegado'}
 `;
+
+    if (tech) {
+      tradeContext += `
+INDICADORES TÉCNICOS REALES (calculados desde velas Binance):
+  Semanal (1S): RSI=${tech.rsi1w} | EMA21=${tech.ema21_1w} | EMA50=${tech.ema50_1w} | Tendencia=${tech.tendencia1w}
+  3 Días (3D):  RSI=${tech.rsi3d} | EMA21=${tech.ema21_3d} | EMA50=${tech.ema50_3d} | MACD alcista=${tech.macd3d_alcista}
+  4 Horas (4H): RSI=${tech.rsi4h} | EMA21=${tech.ema21_4h} | EMA50=${tech.ema50_4h} | Tendencia=${tech.tendencia4h}
+  MACD 4H: línea=${tech.macd4h_line} | señal=${tech.macd4h_signal} | hist=${tech.macd4h_hist} | subiendo=${tech.macd4h_subiendo}
+  Volumen relativo: ${tech.volRelativo}x (${tech.volAlto ? 'ALTO — hay interés' : 'normal'})
+  Soporte 1 más cercano: ${tech.soporte1}
+  Soporte 2: ${tech.soporte2}
+  Resistencia 1 más cercana: ${tech.resistencia1}
+  Resistencia 2: ${tech.resistencia2}
+`;
+    }
   });
 
-  const prompt = `Eres un trader profesional especializado en crypto con amplia experiencia en gestión de posiciones y pyramiding. Analiza estas posiciones en contratos perpetuos Coin-M (donde las ganancias se acumulan en la propia moneda) de Bitget.
+  btn.innerHTML = '<div class="spinner"></div> Analizando con IA...';
 
-PRECIOS EN TIEMPO REAL:
+  const prompt = `Eres un trader profesional de crypto con 10 años de experiencia. Analiza posiciones en perpetuos Coin-M de Bitget donde las ganancias se acumulan en la propia moneda.
+
+DATOS DE MERCADO EN TIEMPO REAL:
 BTC: ${prices.BTC} (${changes.BTC > 0 ? '+' : ''}${changes.BTC?.toFixed(2)}% 24h)
 ETH: ${prices.ETH} (${changes.ETH > 0 ? '+' : ''}${changes.ETH?.toFixed(2)}% 24h)
 NEAR: ${prices.NEAR} (${changes.NEAR > 0 ? '+' : ''}${changes.NEAR?.toFixed(2)}% 24h)
 AVAX: ${prices.AVAX} (${changes.AVAX > 0 ? '+' : ''}${changes.AVAX?.toFixed(2)}% 24h)
 
-POSICIONES ABIERTAS:
+POSICIONES Y DATOS TÉCNICOS CALCULADOS DESDE VELAS REALES:
 ${tradeContext}
 
-CONTEXTO DEL TRADER:
-- Mercado bajista actual apostando por reversión alcista de ciclo
-- Objetivo principal: acumular monedas en Coin-M aprovechando la tendencia alcista futura
-- Capital total invertido ~474€, capital libre total ~741€
+PERFIL DEL TRADER:
 - Swing trader, horizonte semanas-meses
-- Usa pyramiding para construir posiciones grandes en tendencias confirmadas
+- Objetivo: acumular monedas en Coin-M aprovechando reversión alcista de ciclo
+- Capital libre total: ~741€ distribuido por activo
+- Usa pyramiding en 4 fases para construir posiciones grandes
 
-ESTRATEGIA DE PYRAMIDING (aplica siempre en tu análisis):
-El trader usa construcción de posición en 4 fases:
-- FASE 1 (40% capital): Entrada inicial en fondo — ya ejecutada
-- FASE 2 (30% capital): Añadir cuando precio retesta el TP1 superado como soporte
-- FASE 3 (20% capital): Añadir cuando precio retesta el TP2 superado como soporte
-- FASE 4 (10% capital): Añadir en momentum extremo si TP3 superado
+REGLAS DE PYRAMIDING:
+Fase 1 (ya ejecutada): entrada inicial en fondo
+Fase 2 (30% capital libre): añadir cuando precio retesta TP1 superado como soporte nuevo
+Fase 3 (20% capital libre): añadir cuando precio retesta TP2 superado como soporte nuevo
+Fase 4 (10% capital libre): solo en momentum extremo
+REGLA CLAVE: BTC manda — si BTC débil, no añadir altcoins aunque hayan superado TP
+REGLA CLAVE: Nunca perseguir precio. Solo entrar en retests confirmados con volumen.
 
-REGLAS DE ORO DEL PYRAMIDING:
-1. Nunca comprar en máximos — siempre esperar el pullback/retesta del nivel roto
-2. Cuando se añade en nueva fase → mover SL de fase anterior a breakeven
-3. Menos tamaño cuanto más alto está el precio
-4. BTC manda — si BTC débil o en resistencia, no añadir en altcoins aunque hayan superado TP
-5. El pullback de confirmación (retesta del nivel roto como soporte) es la zona exacta de entrada
+GESTIÓN DE TPs:
+BTC 7x: TP1=25%, TP2=25%, TP3=25%, dejar correr 25%
+ETH 5x: TP1=25%, TP2=30%, TP3=20%, dejar correr 25%
+NEAR/AVAX 3x: TP1=20%, TP2=30%, TP3=25%, dejar correr 25%
+CUANDO SE COGE TP: mover SL al nivel anterior confirmado como soporte
 
-SEÑALES PARA AÑADIR POSICIÓN:
-✅ Precio superó TP anterior con volumen alto
-✅ Precio retesta ese nivel y lo respeta como soporte
-✅ RSI en 4H entre 45-60 (no sobrecomprado)
-✅ BTC en tendencia alcista o neutral
-✅ Volumen en la ruptura fue significativamente alto
-❌ No añadir si RSI 4H por encima de 65
-❌ No añadir si BTC en resistencia fuerte o cayendo
-❌ No añadir si el retroceso supera el 8% desde el TP
-❌ No añadir si hay incertidumbre macro importante
+INSTRUCCIONES CRÍTICAS:
+1. Usa SOLO los indicadores técnicos reales proporcionados arriba (RSI, EMA, MACD, soportes)
+2. Basa los niveles de precio en los soportes y resistencias calculados desde las velas reales
+3. Si el TP1 ya fue superado, indícalo explícitamente y recomienda mover SL
+4. Sé CONCISO y ACCIONABLE — el trader quiere saber QUÉ HACER, no teoría
+5. Analiza BTC primero como macro, luego altcoins con ese contexto
 
-GESTIÓN DE TPs (porcentajes a cerrar):
-- BTC (7x): TP1=25%, TP2=25%, TP3=25%, Trailing=25%
-- ETH (5x): TP1=25%, TP2=30%, TP3=20%, Trailing=25%
-- NEAR (3x): TP1=20%, TP2=30%, TP3=25%, Trailing=25%
-- AVAX (3x): TP1=20%, TP2=30%, TP3=25%, Trailing=25%
-
-INSTRUCCIONES DE ANÁLISIS:
-Analiza PRIMERO BTC de forma independiente como indicador macro.
-Luego analiza cada altcoin teniendo en cuenta el contexto de BTC.
-
-Para CADA activo usa EXACTAMENTE este formato:
+Para CADA activo usa EXACTAMENTE este formato sin añadir nada extra:
 
 ---[SÍMBOLO]---
-SITUACIÓN: [Análisis detallado del estado actual — precio vs niveles clave, momentum, estructura de mercado. Mínimo 3-4 frases concretas]
+SITUACIÓN: [3 frases máximo. Estado actual basado en los indicadores técnicos reales. Precio vs EMAs, RSI, MACD. Qué está haciendo el mercado ahora mismo.]
 
-RECOMENDACIÓN: [UNA de: MANTENER / AÑADIR_FASE2 / AÑADIR_FASE3 / AÑADIR_FASE4 / MOVER_SL / TP_PARCIAL / PRECAUCIÓN / CERRAR / CORTO]
+RECOMENDACIÓN: [UNA SOLA: MANTENER / MOVER_SL / TP_PARCIAL / AÑADIR_FASE2 / AÑADIR_FASE3 / PRECAUCIÓN / CERRAR / CORTO]
 
-ACCIÓN: [Qué hacer exactamente ahora mismo, paso a paso con precios concretos]
+ACCIÓN INMEDIATA: [Qué hacer HOY. Máximo 3 pasos concretos con precios exactos basados en los niveles técnicos calculados.]
 
-ENTRADA: [Precio exacto de entrada si recomiendas añadir. Si no aplica escribe: No aplica]
-SL: [Stop loss exacto con justificación del nivel]
-TP1: [Primer objetivo con % de cierre]
-TP2: [Segundo objetivo con % de cierre]
-TP3: [Tercer objetivo con % de cierre]
-TAMAÑO: [% del capital libre recomendado y cantidad en € aproximada]
-APALANCAMIENTO: [Recomendado y por qué]
+ENTRADA: [Precio exacto si recomiendas añadir, basado en soportes reales. Si no aplica: No aplica]
+SL: [Precio exacto basado en soporte real más cercano calculado]
+TP1: [Precio exacto basado en resistencia real calculada — % a cerrar]
+TP2: [Precio exacto — % a cerrar]
+TP3: [Precio exacto si aplica — % a cerrar]
+TAMAÑO: [% del capital libre y euros]
+APALANCAMIENTO: [número y motivo en 5 palabras]
 
-PYRAMIDING: [Análisis detallado en este formato exacto:
-FASE ACTUAL: indica en qué fase estamos (1/2/3/4) y por qué
-CONDICIONES CUMPLIDAS: qué señales ya se dan para la siguiente fase
-CONDICIONES PENDIENTES: qué falta para confirmar la entrada
-PRECIO DE ENTRADA SIGUIENTE FASE: nivel exacto y motivo técnico
-SL DE LA NUEVA ENTRADA: precio exacto del stop
-TAMAÑO: cuánto del capital libre usar y en euros aproximados]
+PYRAMIDING:
+FASE ACTUAL: [número y estado]
+SIGUIENTE ENTRADA: [precio exacto del retests y condición que debe cumplirse]
+SL NUEVA ENTRADA: [precio exacto]
+TAMAÑO: [euros del capital libre disponible]
+CONDICIÓN BLOQUEANTE: [qué impide añadir ahora o qué debe ocurrir primero]
 
-SEÑALES A VIGILAR: [Exactamente 5 señales con este formato para cada una:
+SEÑALES A VIGILAR:
+📅 1S — [indicador]: [qué buscar visualmente en la vela semanal. Señal ALCISTA: X. Señal BAJISTA: Y. Acción: Z]
+📊 3D — [indicador]: [qué buscar en 3D. Señal ALCISTA: X. Señal BAJISTA: Y. Acción: Z]
+⏱ 4H — MACD (12,26,9): [estado actual del histograma calculado=${techMap['BTC']?.macd4h_hist || 'N/A'}. Señal ALCISTA: histograma verde creciendo. Señal BAJISTA: histograma rojo. Acción: Z]
+⏱ 4H — Nivel clave: [precio exacto del soporte/resistencia más relevante basado en datos reales. Qué vela esperar para confirmar. Acción según escenario]
+⏱ 4H — RSI (14): [nivel actual calculado. Señal ALCISTA: RSI cruza X. Señal BAJISTA: RSI supera Y. Acción: Z]
 
-📅 SEMANAL (1S) — [nombre del indicador o nivel]:
-   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 1S
-   Qué buscar visualmente: [descripción exacta del patrón o nivel en la vela semanal]
-   Señal ALCISTA: [aspecto visual concreto — color de vela, posición respecto a media, patrón]
-   Señal BAJISTA: [aspecto visual concreto]
-   Acción: [qué hacer si ocurre cada escenario]
+RIESGO: [AGRESIVO/MODERADO/CAUTO — una frase con el motivo basado en los indicadores reales]
 
-📊 3 DÍAS (3D) — [nombre del indicador o nivel]:
-   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 3D
-   Qué buscar visualmente: [descripción exacta]
-   Señal ALCISTA: [aspecto visual concreto]
-   Señal BAJISTA: [aspecto visual concreto]
-   Acción: [qué hacer]
-
-⏱ 4 HORAS (4H) — MACD:
-   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 4H, añadir MACD (12,26,9)
-   Qué buscar visualmente: [descripción exacta del histograma y cruces de líneas]
-   Señal ALCISTA: [aspecto visual — histograma cambiando de color, cruce de líneas]
-   Señal BAJISTA: [aspecto visual]
-   Acción: [qué hacer]
-
-⏱ 4 HORAS (4H) — NIVEL DE PRECIO CLAVE:
-   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 4H
-   Nivel exacto a marcar: [precio concreto y cómo dibujarlo — línea horizontal en X precio]
-   Señal ALCISTA: [cómo se ve el rebote en ese nivel — tipo de vela, volumen]
-   Señal BAJISTA: [cómo se ve la ruptura — cierre por debajo con volumen]
-   Acción: [qué hacer en cada caso con precio exacto de entrada o salida]
-
-⏱ 4 HORAS (4H) — RSI:
-   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 4H, añadir RSI (14)
-   Qué buscar visualmente: [nivel exacto del RSI y qué patrón — divergencia, cruce de nivel]
-   Señal ALCISTA: [aspecto visual del RSI cuando es buena señal]
-   Señal BAJISTA: [aspecto visual del RSI cuando es mala señal]
-   Acción: [qué hacer]]
-
-RIESGO: [AGRESIVO / MODERADO / CAUTO — explicación detallada de por qué ese nivel de riesgo y qué factores lo determinan]
-
-Usa lenguaje de trader directo y profesional. Sin rodeos. Todos los precios exactos. El análisis debe ser lo suficientemente detallado para que el trader sepa exactamente qué mirar en el gráfico y cuándo actuar.`;
+---FIN [SÍMBOLO]---`;
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
