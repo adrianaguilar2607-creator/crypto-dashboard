@@ -205,6 +205,22 @@ body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkM
     <button class="btn-primary" onclick="openTrade()" style="margin-bottom:0">➕ ABRIR TRADE</button>
   </div>
 
+  <!-- EDITAR TRADE -->
+
+  <div class="form-section">
+    <h3>✏️ Editar Posición</h3>
+    <div id="trades-to-edit"></div>
+    <div id="edit-form" style="display:none">
+      <div class="form-row"><label>NUEVO STOP LOSS</label><input type="number" class="input-field" id="edit-sl" placeholder="0.00" step="any"></div>
+      <div class="form-row"><label>NUEVO TP1</label><input type="number" class="input-field" id="edit-tp1" placeholder="0.00" step="any"></div>
+      <div class="form-row"><label>NUEVO TP2</label><input type="number" class="input-field" id="edit-tp2" placeholder="0.00" step="any"></div>
+      <div class="form-row"><label>NUEVO TP3</label><input type="number" class="input-field" id="edit-tp3" placeholder="0.00" step="any"></div>
+      <div class="form-row"><label>CAPITAL LIBRE (€)</label><input type="number" class="input-field" id="edit-libre" placeholder="0.00" step="any"></div>
+      <button class="btn-primary" onclick="saveEdit()" style="margin-bottom:8px">💾 GUARDAR CAMBIOS</button>
+      <button class="btn-secondary" onclick="cancelEdit()">Cancelar</button>
+    </div>
+  </div>
+
   <div class="form-section">
     <h3>❌ Cerrar Trade</h3>
     <div id="trades-to-close"></div>
@@ -242,19 +258,19 @@ let selClose  = null;
 let selDir    = 'LONG';
 
 const DEFAULT_TRADES = [
-  {id:'btc-001',symbol:'BTC',direction:'LONG',leverage:7,entry:67372,margin:169,capitalLibre:190,sl:67373,tp1:72000,tp2:76500,tp3:88000,openDate:'2026-02-12',status:'OPEN',realizedPnl:48,notes:'Entrada en soporte histórico antiguo ATH 2021'},
+  {id:'btc-001',symbol:'BTC',direction:'LONG',leverage:7,entry:67372,margin:169,capitalLibre:190,sl:69500,tp1:72000,tp2:76500,tp3:88000,openDate:'2026-02-12',status:'OPEN',realizedPnl:48,notes:'Entrada en soporte histórico antiguo ATH 2021'},
   {id:'eth-001',symbol:'ETH',direction:'LONG',leverage:5,entry:2049.90,margin:87,capitalLibre:177,sl:1950,tp1:2400,tp2:2650,tp3:3200,openDate:'2026-02-12',status:'OPEN',realizedPnl:27,notes:'Entrada en zona soporte histórico ciclo'},
   {id:'near-001',symbol:'NEAR',direction:'LONG',leverage:3,entry:1.178,margin:112,capitalLibre:268,sl:1.060,tp1:1.600,tp2:1.900,tp3:3.000,openDate:'2026-02-12',status:'OPEN',realizedPnl:-40,notes:'Acumulación en mínimos de ciclo'},
-  {id:'avax-001',symbol:'AVAX',direction:'LONG',leverage:3,entry:8.368,margin:106,capitalLibre:106,sl:7.000,tp1:11.500,tp2:13.000,tp3:15.000,openDate:'2026-02-12',status:'OPEN',realizedPnl:21,notes:'Fondo de ciclo, zona histórica'}
+  {id:'avax-001',symbol:'AVAX',direction:'LONG',leverage:3,entry:8.368,margin:106,capitalLibre:106,sl:8.000,tp1:11.500,tp2:13.000,tp3:15.000,openDate:'2026-02-12',status:'OPEN',realizedPnl:21,notes:'Fondo de ciclo, zona histórica'}
 ];
 
 // ── Storage ──
 function getTrades() {
-  const s = localStorage.getItem('trades_v2');
-  if(!s) { localStorage.setItem('trades_v2', JSON.stringify(DEFAULT_TRADES)); return DEFAULT_TRADES; }
+  const s = localStorage.getItem('trades_v3');
+  if(!s) { localStorage.setItem('trades_v3', JSON.stringify(DEFAULT_TRADES)); return DEFAULT_TRADES; }
   return JSON.parse(s);
 }
-function saveTrades(t) { localStorage.setItem('trades_v2', JSON.stringify(t)); }
+function saveTrades(t) { localStorage.setItem('trades_v3', JSON.stringify(t)); }
 function getGroqKey() { return localStorage.getItem('groq_key')||''; }
 function getBK() { return { key:localStorage.getItem('bk_key')||'', secret:localStorage.getItem('bk_secret')||'', pass:localStorage.getItem('bk_pass')||'' }; }
 
@@ -363,17 +379,26 @@ async function fetchBitgetPositions() {
     const data=await res.json();
     if(data.code==='00000'&&data.data){
       data.data.forEach(pos=>{
-        const sym = pos.baseCoin || pos.marginCoin;
+        const sym    = pos.baseCoin || pos.marginCoin;
         const unreal = parseFloat(pos.unrealizedPL || 0);
         const margin = parseFloat(pos.marginSize || 1);
         const mark   = parseFloat(pos.markPrice || 0);
-        // ROE real = P&L no realizado / margen × 100
-        const roe = margin > 0 ? (unreal / margin * 100).toFixed(2) : null;
-        bitgetPos[sym] = {
-          roePercent: roe,
-          unrealizedPnl: unreal * mark,  // convertir a USD aprox
-          markPrice: mark
-        };
+        // Coin-M INVERSO (BTC, ETH): unrealizedPL en USD, margin en moneda
+        // ROE = unrealizedPL(USD) / (marginSize(moneda) × markPrice) × 100
+        // Coin-M LINEAL (NEAR, AVAX): ambos en moneda
+        // ROE = unrealizedPL / marginSize × 100
+        const isInverse = ['BTC','ETH'].includes(sym);
+        let roe = null;
+        if (margin > 0 && mark > 0) {
+          if (isInverse) {
+            roe = (unreal / (margin * mark) * 100).toFixed(2);
+          } else {
+            roe = (unreal / margin * 100).toFixed(2);
+          }
+        }
+        // P&L en EUR aprox
+        const pnlEur = isInverse ? unreal : unreal * mark;
+        bitgetPos[sym] = { roePercent: roe, unrealizedPnlEur: pnlEur, markPrice: mark };
       });
       console.log('Bitget OK:', JSON.stringify(bitgetPos));
       updatePriceUI();
@@ -495,45 +520,53 @@ Margen: ${t.margin}€ | Capital libre: ${t.capitalLibre}€ | P&L realizado: ${
 `;
   });
 
-  const prompt=`Eres un trader experto en crypto. RESPONDE SOLO CON EL FORMATO INDICADO. Sin explicaciones extra. Sin texto fuera del formato.
+  const prompt=`Eres un trader experto en crypto perpetuos Coin-M. RESPONDE SOLO CON EL FORMATO. Sin texto fuera del formato.
 
 DATOS TÉCNICOS REALES (velas Binance + posiciones Bitget):
 ${ctx}
 
-REGLAS CRÍTICAS:
-- SL siempre DEBAJO del precio actual en LONG
-- Si TP1 superado → mover SL al soporte más cercano bajo el precio
-- Soportes y resistencias: usar SOLO los calculados arriba
-- BTC primero — su estado condiciona altcoins
-- Pyramiding: añadir SOLO en retests de TP superados, nunca en máximos
-- TPs: BTC=25% c/TP | ETH=25/30/20% | NEAR/AVAX=20/30/25%
+REGLAS CRÍTICAS — NUNCA IGNORAR:
+1. SL SIEMPRE por DEBAJO del precio actual en LONG. Si sugieres SL encima del precio → ERROR GRAVE.
+2. El SL ya configurado de cada posición está en los datos. Úsalo como referencia, no lo cambies a menos que sea necesario.
+3. Soportes/resistencias: usar SOLO los calculados en los datos reales. No inventar niveles.
+4. RIESGO: calcular según distancia SL/precio actual. Si SL está >8% abajo = CAUTO. 5-8% = MODERADO. <5% = AGRESIVO.
+5. BTC primero — su tendencia condiciona altcoins. Si BTC bajista → altcoins PRECAUCIÓN aunque tengan señales alcistas.
+6. TPs: BTC(7x)=25%c/TP | ETH(5x)=25/30/20% | NEAR/AVAX(3x)=20/30/25%
 
-RESPONDE EXACTAMENTE ASÍ PARA CADA ACTIVO:
+PYRAMIDING — REGLAS:
+- Fase 1: entrada ejecutada (en datos)
+- Fase 2: añadir 30% capital libre SOLO si precio retesta TP1 como soporte (pullback a TP1 ±2%)
+- Fase 3: añadir 20% capital libre SOLO si precio retesta TP2 como soporte
+- NUNCA en máximos, siempre en retests confirmados con vela de cierre sobre el nivel
+- Si TP1 no superado → Fase 2 no disponible todavía
+
+FORMATO EXACTO — COPIA ESTO SIN MODIFICAR LA ESTRUCTURA:
 
 ---[SÍMBOLO]---
-SITUACIÓN: [máximo 2 frases. Solo datos reales: RSI, tendencia, MACD]
-RECOMENDACIÓN: [una: MANTENER/MOVER_SL/TP_PARCIAL/AÑADIR_FASE2/AÑADIR_FASE3/PRECAUCIÓN/CERRAR/CORTO]
-ACCIÓN INMEDIATA: [máximo 2 pasos con precios exactos]
-ENTRADA: [precio exacto o: No aplica]
-SL: [precio DEBAJO del actual]
-TP1: [precio — % cerrar]
-TP2: [precio — % cerrar]
-TP3: [precio — % cerrar o: No aplica]
-TAMAÑO: [euros]
+SITUACIÓN: [2 frases máximo. Datos reales: precio vs EMAs, RSI valor, MACD estado, tendencia 4H y 3D]
+RECOMENDACIÓN: [MANTENER / MOVER_SL / TP_PARCIAL / AÑADIR_FASE2 / AÑADIR_FASE3 / PRECAUCIÓN / CERRAR / CORTO]
+ACCIÓN INMEDIATA: [2 pasos máximo. Precios exactos de los soportes/resistencias calculados]
+ENTRADA: [precio exacto basado en soporte real, o: No aplica]
+SL: [precio por debajo del actual. Justificación: soporte real en ese nivel]
+TP1: [precio resistencia real — % a cerrar]
+TP2: [precio — % a cerrar]
+TP3: [precio — % a cerrar, o: No aplica]
+TAMAÑO: [euros del capital libre]
 APALANCAMIENTO: [número]
 PYRAMIDING:
-FASE ACTUAL: [número]
-SIGUIENTE ENTRADA: [precio exacto y condición]
-SL NUEVA ENTRADA: [precio]
-TAMAÑO: [euros]
-CONDICIÓN BLOQUEANTE: [1 frase corta]
+FASE ACTUAL: [1/2/3 — estado en una frase]
+SIGUIENTE ENTRADA: [precio exacto del retes del TP superado ± rango]
+CONDICIÓN VISUAL: [qué vela y en qué timeframe confirma la entrada — sé específico]
+SL NUEVA ENTRADA: [precio exacto por debajo del retes]
+TAMAÑO SIGUIENTE FASE: [euros del capital libre disponible]
+CONDICIÓN BLOQUEANTE: [qué falta exactamente — 1 frase concreta con precio o indicador]
 SEÑALES A VIGILAR:
-📅 1S — [indicador=valor]: ALCISTA: [descripción 10 palabras] | BAJISTA: [descripción 10 palabras] | Acción: [qué hacer]
-📊 3D — [indicador=valor]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
-⏱ 4H — MACD=[valor hist]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
-⏱ 4H — Nivel=[precio]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
-⏱ 4H — RSI=[valor]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
-RIESGO: [AGRESIVO/MODERADO/CAUTO — motivo en 5 palabras]
+📅 1S — [indicador=valor actual]: ALCISTA: [qué ver en la vela semanal] | BAJISTA: [qué ver] | Acción: [precio y qué hacer]
+📊 3D — [indicador=valor actual]: ALCISTA: [descripción visual 3D] | BAJISTA: [descripción] | Acción: [precio y qué hacer]
+⏱ 4H — MACD hist=[valor]: ALCISTA: [histograma verde creciendo, describe] | BAJISTA: [histograma rojo, describe] | Acción: [precio exacto entrada/salida]
+⏱ 4H — Nivel=[precio soporte/resistencia real]: ALCISTA: [vela que rebota con mecha y cierra sobre el nivel] | BAJISTA: [vela que rompe y cierra bajo con volumen] | Acción: [si alcista entrar en X, si bajista cerrar/reducir]
+⏱ 4H — RSI=[valor actual]: ALCISTA: [RSI cruza X o divergencia positiva] | BAJISTA: [RSI supera Y o gira a la baja] | Acción: [qué hacer en cada caso]
+RIESGO: [AGRESIVO/MODERADO/CAUTO — motivo en una frase basado en distancia SL real]
 ---FIN---`;
 
   try {
@@ -712,18 +745,95 @@ function renderHistorial(){
 // ════════════════════════════════════════
 // GESTIÓN TRADES
 // ════════════════════════════════════════
+let selEdit = null;
+
 function renderTradesPage(){
   const trades=getTrades().filter(t=>t.status==='OPEN');
+
+  // Lista para editar
+  const ce=document.getElementById('trades-to-edit');
+  // Lista para cerrar
   const c=document.getElementById('trades-to-close');
-  if(!trades.length){ c.innerHTML='<div class="empty"><div class="icon">📭</div>No hay trades activos</div>'; return; }
-  let html='<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Selecciona el trade a cerrar:</p>';
+
+  if(!trades.length){
+    ce.innerHTML='<div class="empty"><div class="icon">📭</div>No hay trades activos</div>';
+    c.innerHTML='<div class="empty"><div class="icon">📭</div>No hay trades activos</div>';
+    return;
+  }
+
+  let htmlE='<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Selecciona el trade a editar:</p>';
+  let htmlC='<p style="font-size:12px;color:var(--muted);margin-bottom:10px">Selecciona el trade a cerrar:</p>';
+
   trades.forEach(t=>{
     const roe=calcROE(t);
-    html+=`<div class="close-trade-item" id="cti-${t.id}" onclick="selClose2('${t.id}')"><div class="info"><div class="sym">${t.symbol} · ${t.direction} ${t.leverage}x</div><div class="detail">Entrada: ${t.entry.toLocaleString()} · ${t.margin}€</div></div><div class="roe-val ${roe>=0?'up':'down'}">${roe>=0?'+':''}${roe.toFixed(1)}%</div></div>`;
+    const roeStr=(roe>=0?'+':'')+roe.toFixed(1)+'%';
+    const roeClass=roe>=0?'up':'down';
+
+    htmlE+=`<div class="close-trade-item" id="eti-${t.id}" onclick="selEditTrade('${t.id}')">
+      <div class="info">
+        <div class="sym">${t.symbol} · ${t.direction} ${t.leverage}x</div>
+        <div class="detail">SL: ${t.sl} · TP1: ${t.tp1} · Libre: ${t.capitalLibre}€</div>
+      </div>
+      <div class="roe-val ${roeClass}">${roeStr}</div>
+    </div>`;
+
+    htmlC+=`<div class="close-trade-item" id="cti-${t.id}" onclick="selClose2('${t.id}')">
+      <div class="info">
+        <div class="sym">${t.symbol} · ${t.direction} ${t.leverage}x</div>
+        <div class="detail">Entrada: ${t.entry.toLocaleString()} · ${t.margin}€</div>
+      </div>
+      <div class="roe-val ${roeClass}">${roeStr}</div>
+    </div>`;
   });
-  c.innerHTML=html;
+
+  ce.innerHTML=htmlE;
+  c.innerHTML=htmlC;
   document.getElementById('close-form').style.display='none';
-  selClose=null;
+  document.getElementById('edit-form').style.display='none';
+  selClose=null; selEdit=null;
+}
+
+function selEditTrade(id){
+  selEdit=id;
+  document.querySelectorAll('.close-trade-item').forEach(e=>e.classList.remove('selected'));
+  document.getElementById('eti-'+id)?.classList.add('selected');
+  const t=getTrades().find(t=>t.id===id);
+  if(!t) return;
+  document.getElementById('edit-sl').value=t.sl;
+  document.getElementById('edit-tp1').value=t.tp1;
+  document.getElementById('edit-tp2').value=t.tp2;
+  document.getElementById('edit-tp3').value=t.tp3||'';
+  document.getElementById('edit-libre').value=t.capitalLibre||0;
+  document.getElementById('edit-form').style.display='block';
+  document.getElementById('close-form').style.display='none';
+}
+
+function saveEdit(){
+  if(!selEdit) return;
+  const trades=getTrades();
+  const idx=trades.findIndex(t=>t.id===selEdit);
+  if(idx===-1) return;
+  const sl=parseFloat(document.getElementById('edit-sl').value);
+  const tp1=parseFloat(document.getElementById('edit-tp1').value);
+  const tp2=parseFloat(document.getElementById('edit-tp2').value);
+  const tp3=parseFloat(document.getElementById('edit-tp3').value)||trades[idx].tp3;
+  const libre=parseFloat(document.getElementById('edit-libre').value)||0;
+  if(!sl||!tp1||!tp2){ toast('SL, TP1 y TP2 son obligatorios','error'); return; }
+  trades[idx].sl=sl;
+  trades[idx].tp1=tp1;
+  trades[idx].tp2=tp2;
+  trades[idx].tp3=tp3;
+  trades[idx].capitalLibre=libre;
+  saveTrades(trades);
+  toast('Posición actualizada ✅','success');
+  cancelEdit();
+  renderTradesPage();
+}
+
+function cancelEdit(){
+  selEdit=null;
+  document.getElementById('edit-form').style.display='none';
+  document.querySelectorAll('.close-trade-item').forEach(e=>e.classList.remove('selected'));
 }
 
 function selClose2(id){
