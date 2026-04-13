@@ -566,8 +566,7 @@ SEÑALES A VIGILAR:
 ⏱ 4H — MACD hist=[valor]: ALCISTA: [histograma verde creciendo, describe] | BAJISTA: [histograma rojo, describe] | Acción: [precio exacto entrada/salida]
 ⏱ 4H — Nivel=[precio soporte/resistencia real]: ALCISTA: [vela que rebota con mecha y cierra sobre el nivel] | BAJISTA: [vela que rompe y cierra bajo con volumen] | Acción: [si alcista entrar en X, si bajista cerrar/reducir]
 ⏱ 4H — RSI=[valor actual]: ALCISTA: [RSI cruza X o divergencia positiva] | BAJISTA: [RSI supera Y o gira a la baja] | Acción: [qué hacer en cada caso]
-RIESGO: [AGRESIVO/MODERADO/CAUTO — motivo en una frase basado en distancia SL real]
----FIN---`;
+RIESGO: [AGRESIVO/MODERADO/CAUTO — motivo en una frase basado en distancia SL real]`;
 
   try {
     const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
@@ -610,6 +609,18 @@ function renderAnalysis(text, trades, tMap) {
       }
       curSym=null;
     }
+  }
+  // Si el parser falló, intentar extraer secciones por símbolo directamente
+  if(!html.includes('pos-card')){
+    const syms=['BTC','ETH','NEAR','AVAX'];
+    syms.forEach(sym=>{
+      const trade=trades.find(t=>t.symbol===sym);
+      if(!trade) return;
+      // Buscar la sección de este símbolo en el texto
+      const re=new RegExp('---\\[?'+sym+'\\]?---([\\s\\S]*?)(?=---\\[?(?:BTC|ETH|NEAR|AVAX)|$)','i');
+      const m=text.match(re);
+      if(m) html+=renderCard(sym, m[1].trim(), trade, tMap);
+    });
   }
   if(!html.includes('pos-card')){
     html=`<div class="pos-card"><div class="rec-card rec-mantener"><div style="font-size:12px;line-height:1.8;white-space:pre-wrap">${text}</div></div></div>`;
