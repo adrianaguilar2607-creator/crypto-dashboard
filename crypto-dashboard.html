@@ -902,9 +902,50 @@ TP3: [Tercer objetivo con % de cierre]
 TAMAÑO: [% del capital libre recomendado y cantidad en € aproximada]
 APALANCAMIENTO: [Recomendado y por qué]
 
-PYRAMIDING: [Análisis detallado de la situación de construcción de posición. ¿En qué fase estamos? ¿Se cumplen las señales para añadir? ¿Qué condiciones faltan todavía? ¿Cuándo exactamente será el momento de añadir? Sé muy específico con niveles de precio]
+PYRAMIDING: [Análisis detallado en este formato exacto:
+FASE ACTUAL: indica en qué fase estamos (1/2/3/4) y por qué
+CONDICIONES CUMPLIDAS: qué señales ya se dan para la siguiente fase
+CONDICIONES PENDIENTES: qué falta para confirmar la entrada
+PRECIO DE ENTRADA SIGUIENTE FASE: nivel exacto y motivo técnico
+SL DE LA NUEVA ENTRADA: precio exacto del stop
+TAMAÑO: cuánto del capital libre usar y en euros aproximados]
 
-SEÑALES A VIGILAR: [Lista de 3-5 señales concretas que el trader debe monitorizar en el gráfico para tomar la siguiente decisión. Niveles exactos, indicadores, patrones]
+SEÑALES A VIGILAR: [Exactamente 5 señales con este formato para cada una:
+
+📅 SEMANAL (1S) — [nombre del indicador o nivel]:
+   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 1S
+   Qué buscar visualmente: [descripción exacta del patrón o nivel en la vela semanal]
+   Señal ALCISTA: [aspecto visual concreto — color de vela, posición respecto a media, patrón]
+   Señal BAJISTA: [aspecto visual concreto]
+   Acción: [qué hacer si ocurre cada escenario]
+
+📊 3 DÍAS (3D) — [nombre del indicador o nivel]:
+   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 3D
+   Qué buscar visualmente: [descripción exacta]
+   Señal ALCISTA: [aspecto visual concreto]
+   Señal BAJISTA: [aspecto visual concreto]
+   Acción: [qué hacer]
+
+⏱ 4 HORAS (4H) — MACD:
+   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 4H, añadir MACD (12,26,9)
+   Qué buscar visualmente: [descripción exacta del histograma y cruces de líneas]
+   Señal ALCISTA: [aspecto visual — histograma cambiando de color, cruce de líneas]
+   Señal BAJISTA: [aspecto visual]
+   Acción: [qué hacer]
+
+⏱ 4 HORAS (4H) — NIVEL DE PRECIO CLAVE:
+   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 4H
+   Nivel exacto a marcar: [precio concreto y cómo dibujarlo — línea horizontal en X precio]
+   Señal ALCISTA: [cómo se ve el rebote en ese nivel — tipo de vela, volumen]
+   Señal BAJISTA: [cómo se ve la ruptura — cierre por debajo con volumen]
+   Acción: [qué hacer en cada caso con precio exacto de entrada o salida]
+
+⏱ 4 HORAS (4H) — RSI:
+   Qué abrir en TradingView: gráfico [SÍMBOLO] temporalidad 4H, añadir RSI (14)
+   Qué buscar visualmente: [nivel exacto del RSI y qué patrón — divergencia, cruce de nivel]
+   Señal ALCISTA: [aspecto visual del RSI cuando es buena señal]
+   Señal BAJISTA: [aspecto visual del RSI cuando es mala señal]
+   Acción: [qué hacer]]
 
 RIESGO: [AGRESIVO / MODERADO / CAUTO — explicación detallada de por qué ese nivel de riesgo y qué factores lo determinan]
 
@@ -1153,7 +1194,17 @@ function renderTradeAnalysis(sym, text, trade) {
           <span style="font-size:15px">👁</span>
           <span style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--yellow)">SEÑALES A VIGILAR EN EL GRÁFICO</span>
         </div>
-        <div style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${senalesMatch[1].trim()}</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;font-family:-apple-system,monospace">${
+          senalesMatch[1].trim()
+            .replace(/📅 SEMANAL/g, '<span style="color:var(--yellow);font-weight:700">📅 SEMANAL</span>')
+            .replace(/📊 3 DÍAS/g, '<span style="color:var(--orange);font-weight:700">📊 3 DÍAS</span>')
+            .replace(/⏱ 4 HORAS/g, '<span style="color:var(--blue);font-weight:700">⏱ 4 HORAS</span>')
+            .replace(/Señal ALCISTA:/g, '<span style="color:var(--green);font-weight:600">Señal ALCISTA:</span>')
+            .replace(/Señal BAJISTA:/g, '<span style="color:var(--red);font-weight:600">Señal BAJISTA:</span>')
+            .replace(/Acción:/g, '<span style="color:var(--yellow);font-weight:600">Acción:</span>')
+            .replace(/Qué abrir en TradingView:/g, '<span style="color:var(--muted);font-style:italic">📱 TradingView:</span>')
+            .replace(/Qué buscar visualmente:/g, '<span style="color:var(--muted)">👁 Buscar:</span>')
+        }</div>
       </div>` : ''}
 
     </div>
