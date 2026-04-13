@@ -832,7 +832,7 @@ ${t.symbol}: ${t.direction} ${t.leverage}x
 `;
   });
 
-  const prompt = `Eres un trader profesional especializado en crypto. Analiza estas posiciones en contratos perpetuos Coin-M (donde las ganancias se acumulan en la propia moneda) de Bitget.
+  const prompt = `Eres un trader profesional especializado en crypto con amplia experiencia en gestión de posiciones y pyramiding. Analiza estas posiciones en contratos perpetuos Coin-M (donde las ganancias se acumulan en la propia moneda) de Bitget.
 
 PRECIOS EN TIEMPO REAL:
 BTC: ${prices.BTC} (${changes.BTC > 0 ? '+' : ''}${changes.BTC?.toFixed(2)}% 24h)
@@ -844,31 +844,71 @@ POSICIONES ABIERTAS:
 ${tradeContext}
 
 CONTEXTO DEL TRADER:
-- Mercado bajista actual, apostando por reversión alcista
-- Objetivo: acumular monedas en Coin-M aprovechando tendencia alcista futura
+- Mercado bajista actual apostando por reversión alcista de ciclo
+- Objetivo principal: acumular monedas en Coin-M aprovechando la tendencia alcista futura
 - Capital total invertido ~474€, capital libre total ~741€
 - Swing trader, horizonte semanas-meses
+- Usa pyramiding para construir posiciones grandes en tendencias confirmadas
 
-INSTRUCCIONES:
-Analiza PRIMERO BTC de forma independiente como indicador macro del mercado.
-Luego analiza las altcoins (ETH, NEAR, AVAX) teniendo en cuenta el contexto de BTC.
+ESTRATEGIA DE PYRAMIDING (aplica siempre en tu análisis):
+El trader usa construcción de posición en 4 fases:
+- FASE 1 (40% capital): Entrada inicial en fondo — ya ejecutada
+- FASE 2 (30% capital): Añadir cuando precio retesta el TP1 superado como soporte
+- FASE 3 (20% capital): Añadir cuando precio retesta el TP2 superado como soporte
+- FASE 4 (10% capital): Añadir en momentum extremo si TP3 superado
 
-Para CADA activo proporciona en este formato exacto:
+REGLAS DE ORO DEL PYRAMIDING:
+1. Nunca comprar en máximos — siempre esperar el pullback/retesta del nivel roto
+2. Cuando se añade en nueva fase → mover SL de fase anterior a breakeven
+3. Menos tamaño cuanto más alto está el precio
+4. BTC manda — si BTC débil o en resistencia, no añadir en altcoins aunque hayan superado TP
+5. El pullback de confirmación (retesta del nivel roto como soporte) es la zona exacta de entrada
+
+SEÑALES PARA AÑADIR POSICIÓN:
+✅ Precio superó TP anterior con volumen alto
+✅ Precio retesta ese nivel y lo respeta como soporte
+✅ RSI en 4H entre 45-60 (no sobrecomprado)
+✅ BTC en tendencia alcista o neutral
+✅ Volumen en la ruptura fue significativamente alto
+❌ No añadir si RSI 4H por encima de 65
+❌ No añadir si BTC en resistencia fuerte o cayendo
+❌ No añadir si el retroceso supera el 8% desde el TP
+❌ No añadir si hay incertidumbre macro importante
+
+GESTIÓN DE TPs (porcentajes a cerrar):
+- BTC (7x): TP1=25%, TP2=25%, TP3=25%, Trailing=25%
+- ETH (5x): TP1=25%, TP2=30%, TP3=20%, Trailing=25%
+- NEAR (3x): TP1=20%, TP2=30%, TP3=25%, Trailing=25%
+- AVAX (3x): TP1=20%, TP2=30%, TP3=25%, Trailing=25%
+
+INSTRUCCIONES DE ANÁLISIS:
+Analiza PRIMERO BTC de forma independiente como indicador macro.
+Luego analiza cada altcoin teniendo en cuenta el contexto de BTC.
+
+Para CADA activo usa EXACTAMENTE este formato:
 
 ---[SÍMBOLO]---
-SITUACIÓN: [2-3 frases directas sobre el estado actual]
-RECOMENDACIÓN: [UNA de: MANTENER / AÑADIR / MOVER_SL / TP_PARCIAL / PRECAUCIÓN / CERRAR / CORTO]
-ACCIÓN: [qué hacer exactamente, con precios concretos]
-ENTRADA: [precio de entrada si recomiendas añadir o nuevo trade]
-SL: [stop loss exacto]
-TP1: [primer objetivo]
-TP2: [segundo objetivo]  
-TP3: [tercer objetivo si aplica]
-TAMAÑO: [% del capital libre a usar y por qué]
-APALANCAMIENTO: [recomendado]
-RIESGO: [AGRESIVO / MODERADO / CAUTO y por qué en una frase]
+SITUACIÓN: [Análisis detallado del estado actual — precio vs niveles clave, momentum, estructura de mercado. Mínimo 3-4 frases concretas]
 
-Sé directo, conciso y usa lenguaje de trader. Sin rodeos. Precio siempre exacto.`;
+RECOMENDACIÓN: [UNA de: MANTENER / AÑADIR_FASE2 / AÑADIR_FASE3 / AÑADIR_FASE4 / MOVER_SL / TP_PARCIAL / PRECAUCIÓN / CERRAR / CORTO]
+
+ACCIÓN: [Qué hacer exactamente ahora mismo, paso a paso con precios concretos]
+
+ENTRADA: [Precio exacto de entrada si recomiendas añadir. Si no aplica escribe: No aplica]
+SL: [Stop loss exacto con justificación del nivel]
+TP1: [Primer objetivo con % de cierre]
+TP2: [Segundo objetivo con % de cierre]
+TP3: [Tercer objetivo con % de cierre]
+TAMAÑO: [% del capital libre recomendado y cantidad en € aproximada]
+APALANCAMIENTO: [Recomendado y por qué]
+
+PYRAMIDING: [Análisis detallado de la situación de construcción de posición. ¿En qué fase estamos? ¿Se cumplen las señales para añadir? ¿Qué condiciones faltan todavía? ¿Cuándo exactamente será el momento de añadir? Sé muy específico con niveles de precio]
+
+SEÑALES A VIGILAR: [Lista de 3-5 señales concretas que el trader debe monitorizar en el gráfico para tomar la siguiente decisión. Niveles exactos, indicadores, patrones]
+
+RIESGO: [AGRESIVO / MODERADO / CAUTO — explicación detallada de por qué ese nivel de riesgo y qué factores lo determinan]
+
+Usa lenguaje de trader directo y profesional. Sin rodeos. Todos los precios exactos. El análisis debe ser lo suficientemente detallado para que el trader sepa exactamente qué mirar en el gráfico y cuándo actuar.`;
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -880,7 +920,7 @@ Sé directo, conciso y usa lenguaje de trader. Sin rodeos. Precio siempre exacto
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.3
       })
     });
@@ -1017,7 +1057,9 @@ function renderTradeAnalysis(sym, text, trade) {
   const tp3Match = text.match(/TP3:\s*([^\n]+)/i);
   const tamanoMatch = text.match(/TAMA[NÑ]O:\s*([^\n]+)/i);
   const levMatch = text.match(/APALANCAMIENTO:\s*([^\n]+)/i);
-  const situacionMatch = text.match(/SITUACI[OÓ]N:\s*([^\n]+(?:\n(?![A-Z_]+:)[^\n]+)*)/i);
+  const situacionMatch = text.match(/SITUACI[OÓ]N:\s*([\s\S]+?)(?=\nRECOMENDACIÓN:|\nRECOMENDACION:)/i);
+  const pyramidingMatch = text.match(/PYRAMIDING:\s*([\s\S]+?)(?=\nSEÑALES|\nRIESGO:)/i);
+  const senalesMatch = text.match(/SE[ÑN]ALES A VIGILAR:\s*([\s\S]+?)(?=\nRIESGO:)/i);
 
   let detailsHTML = '';
   if (entradaMatch && entradaMatch[1].trim() !== '-') {
@@ -1085,16 +1127,35 @@ function renderTradeAnalysis(sym, text, trade) {
         </div>
       </div>
 
-      <div class="rec-card ${recStyle.cls}">
+      <div class="rec-card ${recStyle.cls}" style="margin-bottom:10px">
         <div class="rec-header">
           <span style="font-size:16px">${recStyle.icon}</span>
-          <span class="rec-tag" style="color:${recStyle.color}">${rec.replace('_',' ')}</span>
+          <span class="rec-tag" style="color:${recStyle.color}">${rec.replace(/_/g,' ')}</span>
         </div>
-        ${situacionMatch ? `<div class="rec-text">${situacionMatch[1].trim()}</div>` : ''}
-        ${accion ? `<div class="rec-text mt8" style="font-weight:600">${accion}</div>` : ''}
+        ${situacionMatch ? `<div class="rec-text" style="margin-bottom:8px">${situacionMatch[1].trim()}</div>` : ''}
+        ${accion ? `<div class="rec-text" style="font-weight:600;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:8px">${accion}</div>` : ''}
         ${detailsHTML ? `<div class="rec-details">${detailsHTML}</div>` : ''}
         <div class="risk-badge ${riskBadges[risk] || 'risk-mod'}">${riskIcons[risk] || '⚡'} RIESGO ${risk}</div>
       </div>
+
+      ${pyramidingMatch ? `
+      <div style="background:rgba(79,142,247,0.06);border:1px solid rgba(79,142,247,0.2);border-radius:12px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:15px">📐</span>
+          <span style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--blue)">PYRAMIDING — CONSTRUCCIÓN DE POSICIÓN</span>
+        </div>
+        <div style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${pyramidingMatch[1].trim()}</div>
+      </div>` : ''}
+
+      ${senalesMatch ? `
+      <div style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.2);border-radius:12px;padding:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:15px">👁</span>
+          <span style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:var(--yellow)">SEÑALES A VIGILAR EN EL GRÁFICO</span>
+        </div>
+        <div style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">${senalesMatch[1].trim()}</div>
+      </div>` : ''}
+
     </div>
   `;
 }
