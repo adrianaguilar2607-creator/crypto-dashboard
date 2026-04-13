@@ -1,48 +1,81 @@
-const crypto = require('crypto');
+const crypto = require(‘crypto’);
 
-exports.handler = async function(event) {
-  const apiKey = process.env.BITGET_API_KEY;
-  const secretKey = process.env.BITGET_SECRET_KEY;
-  const passphrase = process.env.BITGET_PASSPHRASE;
+exports.handler = async function(event, context) {
 
-  const timestamp = Date.now().toString();
-  const method = 'GET';
-  const path = '/api/v2/mix/position/all-position';
-  const query = 'productType=COIN-FUTURES&marginCoin=';
+const apiKey     = process.env.BITGET_API_KEY;
+const secretKey  = process.env.BITGET_SECRET_KEY;
+const passphrase = process.env.BITGET_PASSPHRASE;
 
-  const prehash = timestamp + method + path + '?' + query;
-  const sign = crypto
-    .createHmac('sha256', secretKey)
-    .update(prehash)
-    .digest('base64');
+// CORS preflight
+if (event.httpMethod === ‘OPTIONS’) {
+return {
+statusCode: 200,
+headers: {
+‘Access-Control-Allow-Origin’: ‘*’,
+‘Access-Control-Allow-Headers’: ’*’,
+‘Access-Control-Allow-Methods’: ‘GET, OPTIONS’
+},
+body: ‘’
+};
+}
 
-  try {
-    const res = await fetch(
-      `https://api.bitget.com${path}?${query}`,
-      {
-        headers: {
-          'ACCESS-KEY': apiKey,
-          'ACCESS-SIGN': sign,
-          'ACCESS-TIMESTAMP': timestamp,
-          'ACCESS-PASSPHRASE': passphrase,
-          'Content-Type': 'application/json',
-          'locale': 'es-ES'
-        }
-      }
-    );
+if (!apiKey || !secretKey || !passphrase) {
+return {
+statusCode: 400,
+headers: { ‘Access-Control-Allow-Origin’: ‘*’ },
+body: JSON.stringify({
+error: ‘Variables de entorno no configuradas’,
+hasKey: !!apiKey,
+hasSecret: !!secretKey,
+hasPass: !!passphrase
+})
+};
+}
 
-    const data = await res.json();
+try {
+const timestamp  = Date.now().toString();
+const method     = ‘GET’;
+const path       = ‘/api/v2/mix/position/all-position’;
+const queryStr   = ‘productType=COIN-FUTURES&marginCoin=’;
+const prehash    = timestamp + method + path + ‘?’ + queryStr;
 
-    return {
-      statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify(data)
-    };
+```
+const signature  = crypto
+  .createHmac('sha256', secretKey)
+  .update(prehash)
+  .digest('base64');
 
-  } catch(e) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: e.message })
-    };
+const url = `https://api.bitget.com${path}?${queryStr}`;
+
+const response = await fetch(url, {
+  method: 'GET',
+  headers: {
+    'ACCESS-KEY':        apiKey,
+    'ACCESS-SIGN':       signature,
+    'ACCESS-TIMESTAMP':  timestamp,
+    'ACCESS-PASSPHRASE': passphrase,
+    'Content-Type':      'application/json',
+    'locale':            'es-ES'
   }
+});
+
+const data = await response.json();
+
+return {
+  statusCode: 200,
+  headers: {
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(data)
+};
+```
+
+} catch (err) {
+return {
+statusCode: 500,
+headers: { ‘Access-Control-Allow-Origin’: ‘*’ },
+body: JSON.stringify({ error: err.message })
+};
+}
 };
