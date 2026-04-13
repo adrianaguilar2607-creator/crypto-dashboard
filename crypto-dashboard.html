@@ -363,14 +363,20 @@ async function fetchBitgetPositions() {
     const data=await res.json();
     if(data.code==='00000'&&data.data){
       data.data.forEach(pos=>{
-        const sym=pos.baseCoin;
-        bitgetPos[sym]={
-          roePercent:pos.unrealizedPLR?(parseFloat(pos.unrealizedPLR)*100).toFixed(2):null,
-          unrealizedPnl:parseFloat(pos.unrealizedPL||0),
-          markPrice:parseFloat(pos.markPrice||0)
+        const sym = pos.baseCoin || pos.marginCoin;
+        const unreal = parseFloat(pos.unrealizedPL || 0);
+        const margin = parseFloat(pos.marginSize || 1);
+        const mark   = parseFloat(pos.markPrice || 0);
+        // ROE real = P&L no realizado / margen × 100
+        const roe = margin > 0 ? (unreal / margin * 100).toFixed(2) : null;
+        bitgetPos[sym] = {
+          roePercent: roe,
+          unrealizedPnl: unreal * mark,  // convertir a USD aprox
+          markPrice: mark
         };
       });
-      console.log('Bitget OK — posiciones cargadas:', Object.keys(bitgetPos));
+      console.log('Bitget OK:', JSON.stringify(bitgetPos));
+      updatePriceUI();
     }
   } catch(e){ console.log('Bitget error',e); }
 }
@@ -489,53 +495,45 @@ Margen: ${t.margin}€ | Capital libre: ${t.capitalLibre}€ | P&L realizado: ${
 `;
   });
 
-  const prompt=`Eres un trader profesional de crypto con 10 años de experiencia. Analiza posiciones en perpetuos Coin-M de Bitget.
+  const prompt=`Eres un trader experto en crypto. RESPONDE SOLO CON EL FORMATO INDICADO. Sin explicaciones extra. Sin texto fuera del formato.
 
-DATOS COMPLETOS CON INDICADORES REALES:
+DATOS TÉCNICOS REALES (velas Binance + posiciones Bitget):
 ${ctx}
 
-REGLAS ABSOLUTAS — NO NEGOCIABLES:
-1. SL SIEMPRE por DEBAJO del precio actual en LONG. Nunca por encima. Basado en soportes reales calculados.
-2. Si TP1 ya superado → recomendar MOVER_SL al soporte real más cercano por debajo del precio.
-3. Usar SOLO los soportes y resistencias calculados de las velas reales. No inventar niveles.
-4. BTC se analiza primero — su tendencia condiciona las altcoins.
-5. Máximo 3 pasos en ACCIÓN INMEDIATA — concretos y ejecutables hoy.
+REGLAS CRÍTICAS:
+- SL siempre DEBAJO del precio actual en LONG
+- Si TP1 superado → mover SL al soporte más cercano bajo el precio
+- Soportes y resistencias: usar SOLO los calculados arriba
+- BTC primero — su estado condiciona altcoins
+- Pyramiding: añadir SOLO en retests de TP superados, nunca en máximos
+- TPs: BTC=25% c/TP | ETH=25/30/20% | NEAR/AVAX=20/30/25%
 
-PYRAMIDING: Fase1=ejecutada. Fase2=añadir 30% capital libre cuando precio retesta TP1 como soporte. Fase3=20% cuando retesta TP2. Solo en pullbacks, nunca en máximos.
-TPs a cerrar: BTC(7x)=25% c/TP. ETH(5x)=25/30/20%. NEAR/AVAX(3x)=20/30/25%.
-
-FORMATO EXACTO para cada activo:
+RESPONDE EXACTAMENTE ASÍ PARA CADA ACTIVO:
 
 ---[SÍMBOLO]---
-SITUACIÓN: [3 frases usando los indicadores técnicos reales. RSI actual, tendencia de EMAs, MACD. Estado real del mercado.]
-
-RECOMENDACIÓN: [MANTENER / MOVER_SL / TP_PARCIAL / AÑADIR_FASE2 / AÑADIR_FASE3 / PRECAUCIÓN / CERRAR / CORTO]
-
-ACCIÓN INMEDIATA: [Máximo 3 pasos. Qué hacer HOY con precios exactos de los soportes/resistencias reales calculados.]
-
-ENTRADA: [Precio exacto basado en soporte real. Si no aplica: No aplica]
-SL: [Precio POR DEBAJO del precio actual ${prices.BTC ? '(BTC actual: '+prices.BTC+')' : ''}. Justificación: soporte real en ese nivel]
-TP1: [Precio de resistencia real calculada — % a cerrar]
-TP2: [Precio — % a cerrar]
-TP3: [Precio si aplica — % a cerrar]
-TAMAÑO: [% capital libre y euros]
-APALANCAMIENTO: [número — motivo breve]
-
+SITUACIÓN: [máximo 2 frases. Solo datos reales: RSI, tendencia, MACD]
+RECOMENDACIÓN: [una: MANTENER/MOVER_SL/TP_PARCIAL/AÑADIR_FASE2/AÑADIR_FASE3/PRECAUCIÓN/CERRAR/CORTO]
+ACCIÓN INMEDIATA: [máximo 2 pasos con precios exactos]
+ENTRADA: [precio exacto o: No aplica]
+SL: [precio DEBAJO del actual]
+TP1: [precio — % cerrar]
+TP2: [precio — % cerrar]
+TP3: [precio — % cerrar o: No aplica]
+TAMAÑO: [euros]
+APALANCAMIENTO: [número]
 PYRAMIDING:
 FASE ACTUAL: [número]
-SIGUIENTE ENTRADA: [precio retests exacto del soporte real calculado — condición visual que debe cumplirse]
-SL NUEVA ENTRADA: [precio por debajo del precio actual, soporte real]
-TAMAÑO: [euros del capital libre]
-CONDICIÓN BLOQUEANTE: [qué falta — 1 frase]
-
+SIGUIENTE ENTRADA: [precio exacto y condición]
+SL NUEVA ENTRADA: [precio]
+TAMAÑO: [euros]
+CONDICIÓN BLOQUEANTE: [1 frase corta]
 SEÑALES A VIGILAR:
-📅 1S — [indicador con valor actual]: [qué buscar en vela semanal. ALCISTA: descripción visual. BAJISTA: descripción visual. Acción: qué hacer]
-📊 3D — [indicador con valor actual]: [igual]
-⏱ 4H — MACD (hist actual): [igual. Incluir valor del histograma actual]
-⏱ 4H — Nivel [precio exacto soporte/resistencia real]: [qué vela confirma. ALCISTA: X. BAJISTA: Y. Acción: Z con precio]
-⏱ 4H — RSI (actual): [igual]
-
-RIESGO: [AGRESIVO/MODERADO/CAUTO — frase con motivo basado en datos reales]
+📅 1S — [indicador=valor]: ALCISTA: [descripción 10 palabras] | BAJISTA: [descripción 10 palabras] | Acción: [qué hacer]
+📊 3D — [indicador=valor]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
+⏱ 4H — MACD=[valor hist]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
+⏱ 4H — Nivel=[precio]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
+⏱ 4H — RSI=[valor]: ALCISTA: [descripción] | BAJISTA: [descripción] | Acción: [qué hacer]
+RIESGO: [AGRESIVO/MODERADO/CAUTO — motivo en 5 palabras]
 ---FIN---`;
 
   try {
