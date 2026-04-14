@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -139,8 +140,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <body>
 
 <!-- ═══════════════════════════════════════ -->
+
 <!-- DASHBOARD -->
+
 <!-- ═══════════════════════════════════════ -->
+
 <div id="page-dashboard" class="page active">
   <div class="header">
     <div><h1>📊 Crypto Dashboard</h1><span id="last-update">Actualizando...</span></div>
@@ -148,6 +152,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Setup Groq -->
+
   <div id="setup-groq" class="card" style="display:none">
     <h3>🤖 Configurar Groq API</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Necesaria para el análisis IA</p>
@@ -156,6 +161,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Precios -->
+
   <div class="prices-grid">
     <div class="price-card"><div class="sym">BTC/USDT</div><div class="prc" id="p-BTC">—</div><div class="chg" id="c-BTC">—</div></div>
     <div class="price-card"><div class="sym">ETH/USDT</div><div class="prc" id="p-ETH">—</div><div class="chg" id="c-ETH">—</div></div>
@@ -163,13 +169,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <div class="price-card"><div class="sym">AVAX/USDT</div><div class="prc" id="p-AVAX">—</div><div class="chg" id="c-AVAX">—</div></div>
   </div>
 
-  <button class="btn-primary" id="btn-analyze" onclick="runAnalysis()">🔍 ANALIZAR AHORA</button>
+<button class="btn-primary" id="btn-analyze" onclick="runAnalysis()">🔍 ANALIZAR AHORA</button>
+
   <div id="analysis-output"></div>
 </div>
 
 <!-- ═══════════════════════════════════════ -->
+
 <!-- HISTORIAL -->
+
 <!-- ═══════════════════════════════════════ -->
+
 <div id="page-historial" class="page">
   <div class="header">
     <div><h1>📋 Historial</h1></div>
@@ -181,25 +191,68 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Resumen general -->
+
   <div class="sec-title">Resumen General</div>
   <div class="summary-grid" id="summary-grid"></div>
 
   <!-- Acumulado por moneda -->
+
   <div class="sec-title">Acumulado por Moneda (Coin-M)</div>
   <div class="accum-grid" id="accum-grid"></div>
 
+  <!-- Añadir evento pasado -->
+
+  <div class="sec-title">Añadir Cierre Pasado</div>
+  <div class="card" id="past-event-form">
+    <div class="form-row"><label>ACTIVO</label>
+      <select class="select-field" id="pe-symbol">
+        <option value="BTC">BTC</option>
+        <option value="ETH">ETH</option>
+        <option value="NEAR">NEAR</option>
+        <option value="AVAX">AVAX</option>
+      </select>
+    </div>
+    <div class="form-row"><label>FECHA</label>
+      <input type="date" class="input-field" id="pe-date">
+    </div>
+    <div class="form-row"><label>PRECIO DE CIERRE (USDT)</label>
+      <input type="number" class="input-field" id="pe-price" placeholder="ej: 2400" step="any" oninput="calcPeUsdt()">
+    </div>
+    <div class="form-row"><label>GANANCIA EN MONEDA NATIVA</label>
+      <input type="number" class="input-field" id="pe-native" placeholder="ej: 0.0073 ETH" step="any" oninput="calcPeUsdt()">
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:10px;font-size:13px">
+      <span style="color:var(--muted)">Equivalente USDT: </span>
+      <span id="pe-usdt-calc" style="color:var(--green);font-weight:700">—</span>
+    </div>
+    <div class="form-row"><label>MOTIVO</label>
+      <select class="select-field" id="pe-reason">
+        <option value="TP1">TP1</option>
+        <option value="TP2">TP2</option>
+        <option value="TP3">TP3</option>
+        <option value="MANUAL">Manual</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="addPastEvent()" style="margin-bottom:0">💾 AÑADIR AL HISTORIAL</button>
+  </div>
+
   <!-- Eventos -->
+
   <div class="sec-title">Registro de Eventos</div>
   <div id="events-list"></div>
 </div>
 
 <!-- ═══════════════════════════════════════ -->
+
 <!-- TRADES COIN-M -->
+
 <!-- ═══════════════════════════════════════ -->
+
 <div id="page-coinm" class="page">
   <div class="header"><h1>🔶 Trades Coin-M</h1></div>
 
   <!-- Abrir -->
+
   <div class="form-section">
     <h3>➕ Abrir Posición</h3>
     <div class="form-row"><label>ACTIVO</label>
@@ -228,6 +281,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Editar -->
+
   <div class="form-section">
     <h3>✏️ Editar Posición</h3>
     <div id="trades-to-edit"></div>
@@ -243,6 +297,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Aumentar posición -->
+
   <div class="form-section">
     <h3>📈 Aumentar Posición</h3>
     <div id="trades-to-add"></div>
@@ -255,6 +310,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Cerrar -->
+
   <div class="form-section">
     <h3>❌ Cerrar / Parcial</h3>
     <div id="trades-to-close"></div>
@@ -287,15 +343,20 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 </div>
 
 <!-- ═══════════════════════════════════════ -->
+
 <!-- TRADES USDT-M -->
+
 <!-- ═══════════════════════════════════════ -->
+
 <div id="page-usdtm" class="page">
   <div class="header"><h1>💵 Trades USDT-M</h1></div>
 
   <!-- Resumen USDT-M -->
+
   <div class="summary-grid" id="usdtm-summary"></div>
 
   <!-- Abrir USDT-M -->
+
   <div class="form-section">
     <h3>➕ Registrar Trade</h3>
     <div class="form-row"><label>SÍMBOLO</label><input type="text" class="input-field" id="um-symbol" placeholder="BTCUSDT, ETHUSDT..."></div>
@@ -313,10 +374,12 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Lista USDT-M activos -->
+
   <div class="sec-title">Trades Activos</div>
   <div id="usdtm-open-list"></div>
 
   <!-- Cerrar USDT-M -->
+
   <div id="usdtm-close-section" style="display:none" class="form-section">
     <h3>❌ Cerrar Trade USDT-M</h3>
     <div class="form-row"><label>PRECIO CIERRE (USDT)</label><input type="number" class="input-field" id="um-close-price" step="any"></div>
@@ -337,13 +400,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <!-- Historial USDT-M -->
+
   <div class="sec-title" style="margin-top:16px">Historial USDT-M</div>
   <div id="usdtm-closed-list"></div>
 </div>
 
 <!-- ═══════════════════════════════════════ -->
+
 <!-- SETTINGS -->
+
 <!-- ═══════════════════════════════════════ -->
+
 <div id="page-settings" class="page">
   <div class="header"><h1>⚙️ Configuración</h1></div>
   <div class="form-section">
@@ -367,6 +434,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 </div>
 
 <!-- TABS -->
+
 <div class="tabs-bar">
   <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="icon">📊</span>Dashboard</button>
   <button class="tab-btn" onclick="showTab('historial',this)"><span class="icon">📋</span>Historial</button>
@@ -425,6 +493,55 @@ function getBK(){return{key:localStorage.getItem(SK.bk_key)||'',secret:localStor
 function getEurRate(){return parseFloat(localStorage.getItem(SK.eur)||'1.13');}
 
 function addEvent(ev){const evs=getEvents();evs.unshift({...ev,date:new Date().toISOString()});if(evs.length>200)evs.pop();saveEvents(evs);}
+
+function calcPeUsdt(){
+  const price=parseFloat(document.getElementById('pe-price').value)||0;
+  const native=parseFloat(document.getElementById('pe-native').value)||0;
+  const usdt=native*price;
+  document.getElementById('pe-usdt-calc').textContent=usdt>0?usdt.toFixed(4)+' USDT':'—';
+}
+
+function addPastEvent(){
+  const sym=document.getElementById('pe-symbol').value;
+  const date=document.getElementById('pe-date').value;
+  const price=parseFloat(document.getElementById('pe-price').value);
+  const native=parseFloat(document.getElementById('pe-native').value);
+  const reason=document.getElementById('pe-reason').value;
+  if(!date||!price||!native){toast('Rellena fecha, precio y ganancia nativa','error');return;}
+  const pnlUsdt=native*price;
+  // Añadir al registro de eventos con fecha real
+  const evs=getEvents();
+  evs.push({
+    type:'partial',
+    symbol:sym,
+    price,
+    native,
+    pnlUsdt,
+    reason,
+    date:new Date(date).toISOString(),
+    note:'Evento pasado (antes del dashboard)'
+  });
+  // Ordenar por fecha
+  evs.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(evs.length>200)evs.pop();
+  saveEvents(evs);
+
+  // Actualizar acumulado nativo en el trade activo correspondiente
+  const trades=getTrades();
+  const idx=trades.findIndex(t=>t.symbol===sym&&t.status==='OPEN');
+  if(idx>=0){
+    trades[idx].accumNative=(trades[idx].accumNative||0)+native;
+    trades[idx].realizedUsdt=(trades[idx].realizedUsdt||0)+pnlUsdt;
+    saveTrades(trades);
+  }
+
+  // Limpiar form
+  document.getElementById('pe-price').value='';
+  document.getElementById('pe-native').value='';
+  document.getElementById('pe-usdt-calc').textContent='—';
+  toast(`Evento añadido: +${native} ${sym} = ${pnlUsdt.toFixed(4)} USDT ✅`,'success');
+  renderHistorial();
+}
 
 // ════════════════════════════════════════
 // SETTINGS
@@ -489,15 +606,21 @@ function toast(msg,type='success'){
 // ROE CALCULATION — Coin-M todos inversos
 // ════════════════════════════════════════
 function calcROE(trade){
-  if(bitgetPos[trade.symbol]?.roePercent) return parseFloat(bitgetPos[trade.symbol].roePercent);
+  const bp=bitgetPos[trade.symbol];
+  if(bp?.roePercent){
+    const r=parseFloat(bp.roePercent);
+    // Sanity check: ROE no puede ser mayor que apalancamiento × 200%
+    if(Math.abs(r) < trade.leverage * 200) return r;
+  }
   const p=prices[trade.symbol]||trade.entry;
   const e=trade.entry, l=trade.leverage;
   return trade.direction==='LONG'?((1/e-1/p)*p*l*100):((1/p-1/e)*p*l*100);
 }
 
 function calcUnrealUsdt(trade){
-  if(bitgetPos[trade.symbol]?.unrealizedUsdt) return bitgetPos[trade.symbol].unrealizedUsdt;
-  return trade.marginUsdt*(calcROE(trade)/100);
+  // Usar siempre ROE × margen para evitar conversiones erróneas
+  const roe=calcROE(trade);
+  return trade.marginUsdt*(roe/100);
 }
 
 function distPct(from,to){return ((to-from)/from*100).toFixed(2);}
@@ -518,9 +641,12 @@ async function fetchBitgetPositions(){
         const margin=parseFloat(pos.marginSize||1);
         const mark=parseFloat(pos.markPrice||0);
         // Todos Coin-M son inversos: ROE = unrealizedPL / (marginSize × markPrice) × 100
+        // Coin-M inverso: ROE = unrealizedPL / (marginSize × markPrice) × 100
         const roe=(margin>0&&mark>0)?(unreal/(margin*mark)*100).toFixed(2):null;
-        const unrealUsdt=unreal*mark;
-        bitgetPos[sym]={roePercent:roe,unrealizedUsdt:unrealUsdt,markPrice:mark};
+        // unrealizedPL ya está en moneda base → USDT = unrealizedPL × markPrice
+        // Pero para evitar el bug anterior, usamos ROE × margenUSDT
+        const roeNum=roe?parseFloat(roe):0;
+        bitgetPos[sym]={roePercent:roe,markPrice:mark,roeNum};
       });
       updatePriceUI();
     }
@@ -682,7 +808,7 @@ async function runAnalysis(){
     const isBtc=t.symbol==='BTC';
 
     ctx+=`
-═══ ${t.symbol}USDT ═══
+═══ ${t.symbol} ═══
 POSICIÓN: ${t.direction} ${t.leverage}x | Entrada: ${t.entry} USDT | Precio actual: ${cp} USDT
 ROE: ${roe}% ${hasBg?'(BITGET REAL)':'(calculado)'}
 P&L no realizado: ${unreal} USDT (${toEur(parseFloat(unreal))} EUR)
@@ -754,7 +880,7 @@ REGLAS ABSOLUTAS:
 
 RESPONDE EXACTAMENTE CON ESTE FORMATO PARA CADA ACTIVO (sin texto fuera):
 
----[SÍMBOLO]---
+---[SÍMBOLO sin USDT, solo BTC/ETH/NEAR/AVAX]---
 SITUACIÓN: [2 frases máximo. Acción del precio real: dónde está respecto al rango, estructura de velas, qué dicen las EMAs]
 RECOMENDACIÓN: [MANTENER / MOVER_SL / TP_PARCIAL / AÑADIR_MODERADO / AÑADIR_AGRESIVO / PRECAUCIÓN / CERRAR / CORTO]
 ACCIÓN: [máximo 2 pasos concretos con precios exactos en USDT]
@@ -799,14 +925,15 @@ function renderAnalysis(text,trades,tMap){
   const out=document.getElementById('analysis-output');
   let html='<div class="sec-title">Bitcoin</div>';
   let curSym=null,altAdded=false;
-  const secs=text.split(/---(\w+)---/).filter(s=>s.trim());
+  const secs=text.split(/---\[?(\w+)\]?---/).filter(s=>s.trim());
   const btcCh=changes.BTC||0;
   const btcCtxColor=btcCh>2?'var(--green)':btcCh<-2?'var(--red)':'var(--yellow)';
   const btcCtxText=btcCh>2?'🟢 ALCISTA':btcCh<-2?'🔴 BAJISTA':'🟡 NEUTRAL';
 
   for(let i=0;i<secs.length;i++){
     const s=secs[i].trim();
-    if(['BTC','ETH','NEAR','AVAX'].includes(s)){curSym=s;continue;}
+    const cleanS=s.replace(/USDT$/i,'').replace(/USD$/i,'');
+    if(['BTC','ETH','NEAR','AVAX'].includes(cleanS)){curSym=cleanS;continue;}
     if(curSym){
       const trade=trades.find(t=>t.symbol===curSym);
       if(trade)html+=renderCard(curSym,s,trade,tMap);
@@ -824,7 +951,7 @@ function renderAnalysis(text,trades,tMap){
     syms.forEach(sym=>{
       const trade=trades.find(t=>t.symbol===sym);
       if(!trade)return;
-      const re=new RegExp('---\\[?'+sym+'\\]?---([\\s\\S]*?)(?=---\\[?(?:BTC|ETH|NEAR|AVAX)|$)','i');
+      const re=new RegExp('---\\[?'+sym+'(?:USDT)?\\]?---([\\s\\S]*?)(?=---\\[?(?:BTC|ETH|NEAR|AVAX)|$)','i');
       const m=text.match(re);
       if(m)html+=renderCard(sym,m[1].trim(),trade,tMap);
     });
@@ -1335,5 +1462,6 @@ window.addEventListener('load',()=>{
   setInterval(fetchBitgetPositions,60000);
 });
 </script>
+
 </body>
 </html>
