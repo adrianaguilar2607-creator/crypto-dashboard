@@ -433,10 +433,63 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════ -->
+
+<!-- MERCADO -->
+
+<!-- ═══════════════════════════════════════ -->
+
+<div id="page-mercado" class="page">
+  <div class="header">
+    <div><h1>🌍 Mercado</h1><span id="mercado-update">Actualizando...</span></div>
+    <button class="btn-export" onclick="fetchMarketData()" style="font-size:11px">🔄 Refresh</button>
+  </div>
+
+  <!-- FUTUROS -->
+
+  <div class="sec-title">Futuros</div>
+  <div class="summary-grid" id="futures-grid">
+    <div class="summary-card"><div class="lbl">FUNDING BTC</div><div class="val" id="m-funding-btc">—</div><div class="sub" id="m-funding-btc-sub">cada 8h</div></div>
+    <div class="summary-card"><div class="lbl">FUNDING ETH</div><div class="val" id="m-funding-eth">—</div><div class="sub" id="m-funding-eth-sub">cada 8h</div></div>
+    <div class="summary-card"><div class="lbl">LONG/SHORT BTC</div><div class="val" id="m-ls-btc">—</div><div class="sub">ratio posiciones</div></div>
+    <div class="summary-card"><div class="lbl">OPEN INTEREST BTC</div><div class="val" id="m-oi-btc">—</div><div class="sub" id="m-oi-sub">USD</div></div>
+  </div>
+
+  <!-- SENTIMIENTO -->
+
+  <div class="sec-title">Sentimiento</div>
+  <div class="card" id="fear-greed-card" style="display:flex;align-items:center;gap:16px;padding:20px">
+    <div style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;border:3px solid var(--border)" id="fg-circle">—</div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.5px">FEAR & GREED INDEX</div>
+      <div style="font-size:20px;font-weight:800;margin-top:4px" id="fg-label">Cargando...</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px" id="fg-sub">—</div>
+    </div>
+  </div>
+
+  <!-- MACRO -->
+
+  <div class="sec-title">Macro</div>
+  <div class="summary-grid" id="macro-grid">
+    <div class="summary-card"><div class="lbl">DXY</div><div class="val" id="m-dxy">—</div><div class="sub" id="m-dxy-sub">Índice dólar</div></div>
+    <div class="summary-card"><div class="lbl">SP500</div><div class="val" id="m-sp500">—</div><div class="sub" id="m-sp500-sub">S&P 500</div></div>
+    <div class="summary-card"><div class="lbl">FED RATE</div><div class="val" id="m-fed">—</div><div class="sub">Tipo de interés</div></div>
+    <div class="summary-card"><div class="lbl">M2 GLOBAL</div><div class="val" id="m-m2">—</div><div class="sub" id="m-m2-sub">Liquidez</div></div>
+  </div>
+
+  <!-- INTERPRETACIÓN IA -->
+
+  <div class="sec-title">Lectura del Mercado</div>
+  <div id="market-reading" class="card" style="font-size:13px;line-height:1.8;color:var(--muted)">
+    Pulsa Refresh para cargar los datos del mercado
+  </div>
+</div>
+
 <!-- TABS -->
 
 <div class="tabs-bar">
   <button class="tab-btn active" onclick="showTab('dashboard',this)"><span class="icon">📊</span>Dashboard</button>
+  <button class="tab-btn" onclick="showTab('mercado',this)"><span class="icon">🌍</span>Mercado</button>
   <button class="tab-btn" onclick="showTab('historial',this)"><span class="icon">📋</span>Historial</button>
   <button class="tab-btn" onclick="showTab('coinm',this)"><span class="icon">🔶</span>Coin-M</button>
   <button class="tab-btn" onclick="showTab('usdtm',this)"><span class="icon">💵</span>USDT-M</button>
@@ -582,6 +635,187 @@ function showTab(tab,btn){
   if(tab==='coinm')renderCoinmPage();
   if(tab==='usdtm')renderUsdtmPage();
   if(tab==='settings')loadSettings();
+  if(tab==='mercado')fetchMarketData();
+}
+
+// ════════════════════════════════════════
+// MARKET DATA
+// ════════════════════════════════════════
+let marketData = {};
+
+async function fetchMarketData(){
+  document.getElementById('market-reading').innerHTML='<div class="spinner"></div> Cargando datos...';
+
+  try{
+    // Funding rates desde Binance
+    const [fundBtc, fundEth, lsBtc, oiBtc, fg] = await Promise.allSettled([
+      fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT').then(r=>r.json()),
+      fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=ETHUSDT').then(r=>r.json()),
+      fetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1').then(r=>r.json()),
+      fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT').then(r=>r.json()),
+      fetch('https://api.alternative.me/fng/?limit=1').then(r=>r.json())
+    ]);
+
+    // Funding BTC
+    if(fundBtc.status==='fulfilled'&&fundBtc.value.lastFundingRate!=null){
+      const fr=(parseFloat(fundBtc.value.lastFundingRate)*100).toFixed(4);
+      const frNum=parseFloat(fr);
+      const el=document.getElementById('m-funding-btc');
+      el.textContent=(frNum>=0?'+':'')+fr+'%';
+      el.style.color=frNum>0.05?'var(--red)':frNum<-0.01?'var(--green)':'var(--text)';
+      document.getElementById('m-funding-btc-sub').textContent=frNum>0.05?'⚠️ Sobrecargado longs':frNum<-0.01?'✅ Shorts dominan':'Neutral';
+      marketData.fundingBtc=frNum;
+    }
+
+    // Funding ETH
+    if(fundEth.status==='fulfilled'&&fundEth.value.lastFundingRate!=null){
+      const fr=(parseFloat(fundEth.value.lastFundingRate)*100).toFixed(4);
+      const frNum=parseFloat(fr);
+      const el=document.getElementById('m-funding-eth');
+      el.textContent=(frNum>=0?'+':'')+fr+'%';
+      el.style.color=frNum>0.05?'var(--red)':frNum<-0.01?'var(--green)':'var(--text)';
+      document.getElementById('m-funding-eth-sub').textContent=frNum>0.05?'⚠️ Sobrecargado':frNum<-0.01?'✅ Shorts dominan':'Neutral';
+      marketData.fundingEth=frNum;
+    }
+
+    // Long/Short ratio
+    if(lsBtc.status==='fulfilled'&&Array.isArray(lsBtc.value)&&lsBtc.value.length>0){
+      const ls=lsBtc.value[0];
+      const ratio=parseFloat(ls.longShortRatio).toFixed(2);
+      const el=document.getElementById('m-ls-btc');
+      el.textContent=ratio;
+      el.style.color=ratio>1.5?'var(--red)':ratio<0.8?'var(--green)':'var(--text)';
+      marketData.lsRatio=parseFloat(ratio);
+    }
+
+    // Open Interest BTC
+    if(oiBtc.status==='fulfilled'&&oiBtc.value.openInterest){
+      const oi=parseFloat(oiBtc.value.openInterest)*prices.BTC;
+      const oiB=(oi/1e9).toFixed(2);
+      document.getElementById('m-oi-btc').textContent=oiB+'B';
+      document.getElementById('m-oi-sub').textContent='USD — '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      marketData.openInterest=oi;
+    }
+
+    // Fear & Greed
+    if(fg.status==='fulfilled'&&fg.value.data){
+      const fgData=fg.value.data[0];
+      const val=parseInt(fgData.value);
+      const label=fgData.value_classification;
+      const circle=document.getElementById('fg-circle');
+      const labelEl=document.getElementById('fg-label');
+      circle.textContent=val;
+      labelEl.textContent=label;
+      document.getElementById('fg-sub').textContent='Actualizado: '+new Date(fgData.timestamp*1000).toLocaleDateString('es-ES');
+      const color=val<=25?'var(--red)':val<=45?'var(--orange)':val<=55?'var(--yellow)':val<=75?'var(--green)':'var(--purple)';
+      circle.style.borderColor=color;
+      circle.style.color=color;
+      labelEl.style.color=color;
+      marketData.fearGreed=val;
+      marketData.fearGreedLabel=label;
+    }
+
+    // DXY y SP500 via Yahoo Finance proxy
+    const [dxyRes, spRes] = await Promise.allSettled([
+      fetch('https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d').then(r=>r.json()),
+      fetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=2d').then(r=>r.json())
+    ]);
+
+    if(dxyRes.status==='fulfilled'){
+      try{
+        const d=dxyRes.value.chart.result[0];
+        const closes=d.indicators.quote[0].close;
+        const last=closes[closes.length-1];
+        const prev=closes[closes.length-2];
+        const chg=((last-prev)/prev*100).toFixed(2);
+        const el=document.getElementById('m-dxy');
+        el.textContent=last.toFixed(2);
+        el.style.color=parseFloat(chg)>0?'var(--red)':'var(--green)';
+        document.getElementById('m-dxy-sub').textContent=(chg>0?'+':'')+chg+'% — DXY sube = crypto presión';
+        marketData.dxy=last;
+        marketData.dxyChg=parseFloat(chg);
+      }catch(e){}
+    }
+
+    if(spRes.status==='fulfilled'){
+      try{
+        const d=spRes.value.chart.result[0];
+        const closes=d.indicators.quote[0].close;
+        const last=closes[closes.length-1];
+        const prev=closes[closes.length-2];
+        const chg=((last-prev)/prev*100).toFixed(2);
+        const el=document.getElementById('m-sp500');
+        el.textContent=last.toFixed(0);
+        el.style.color=parseFloat(chg)>=0?'var(--green)':'var(--red)';
+        document.getElementById('m-sp500-sub').textContent=(chg>=0?'+':'')+chg+'% — correlación BTC';
+        marketData.sp500=last;
+        marketData.sp500Chg=parseFloat(chg);
+      }catch(e){}
+    }
+
+    // FED Rate — valor conocido, actualizamos solo si cambia
+    document.getElementById('m-fed').textContent='4.25-4.50%';
+
+    // M2 — dato aproximado actualizado trimestralmente
+    document.getElementById('m-m2').textContent='~108T';
+    document.getElementById('m-m2-sub').textContent='USD — creciendo ~3% anual';
+    marketData.m2='108T creciendo';
+
+    document.getElementById('mercado-update').textContent='Actualizado: '+new Date().toLocaleTimeString('es-ES');
+
+    // Generar lectura del mercado
+    renderMarketReading();
+
+  }catch(e){
+    console.log('Market error',e);
+    document.getElementById('market-reading').textContent='Error cargando datos. Inténtalo de nuevo.';
+  }
+}
+
+function renderMarketReading(){
+  const fr=marketData.fundingBtc||0;
+  const ls=marketData.lsRatio||1;
+  const fg=marketData.fearGreed||50;
+  const dxyChg=marketData.dxyChg||0;
+  const sp500Chg=marketData.sp500Chg||0;
+
+  let signals=[];
+  let bullCount=0, bearCount=0;
+
+  // Funding
+  if(fr>0.05){signals.push('⚠️ Funding BTC muy positivo — mercado sobrecargado de longs, probable corrección antes de subir');bearCount++;}
+  else if(fr<-0.01){signals.push('✅ Funding BTC negativo — shorts dominan, posible short squeeze alcista');bullCount++;}
+  else{signals.push('🟡 Funding BTC neutral — mercado equilibrado, movimiento sostenible');}
+
+  // Long/Short
+  if(ls>1.5){signals.push('⚠️ Ratio long/short '+ls+' — demasiados longs, vulnerabilidad a barrida');bearCount++;}
+  else if(ls<0.8){signals.push('✅ Ratio long/short '+ls+' — shorts dominan, combustible para subida');bullCount++;}
+
+  // Fear & Greed
+  if(fg<=25){signals.push('✅ Fear & Greed: '+fg+' (Miedo extremo) — señal contrarian alcista históricamente');bullCount++;}
+  else if(fg>=75){signals.push('⚠️ Fear & Greed: '+fg+' (Codicia extrema) — señal de techo, precaución');bearCount++;}
+  else{signals.push('🟡 Fear & Greed: '+fg+' — sentimiento neutral, sin extremos');}
+
+  // DXY
+  if(dxyChg>0.5){signals.push('⚠️ DXY subiendo +'+dxyChg+'% — dólar fuerte, presión bajista en crypto');bearCount++;}
+  else if(dxyChg<-0.3){signals.push('✅ DXY bajando '+dxyChg+'% — dólar débil, favorable para crypto');bullCount++;}
+
+  // SP500
+  if(sp500Chg>1){signals.push('✅ SP500 +'+sp500Chg+'% — risk-on, correlación positiva con BTC');bullCount++;}
+  else if(sp500Chg<-1){signals.push('⚠️ SP500 '+sp500Chg+'% — risk-off, posible arrastre bajista en BTC');bearCount++;}
+
+  // Conclusión
+  let conclusion='';
+  if(bullCount>bearCount){
+    conclusion=`<div style="margin-top:12px;padding:10px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:10px;font-weight:700;color:var(--green)">🟢 CONTEXTO ALCISTA (${bullCount} señales alcistas vs ${bearCount} bajistas)</div>`;
+  }else if(bearCount>bullCount){
+    conclusion=`<div style="margin-top:12px;padding:10px;background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3);border-radius:10px;font-weight:700;color:var(--red)">🔴 CONTEXTO BAJISTA (${bearCount} señales bajistas vs ${bullCount} alcistas)</div>`;
+  }else{
+    conclusion=`<div style="margin-top:12px;padding:10px;background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);border-radius:10px;font-weight:700;color:var(--yellow)">🟡 CONTEXTO MIXTO — esperar confirmación</div>`;
+  }
+
+  document.getElementById('market-reading').innerHTML=
+    signals.map(s=>`<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;line-height:1.6">${s}</div>`).join('')+conclusion;
 }
 
 function loadSettings(){
@@ -829,6 +1063,18 @@ DATOS TÉCNICOS (velas reales Binance):
 `;
   });
 
+  // Añadir contexto de mercado al prompt
+  const mktCtx=`
+DATOS DE MERCADO EN TIEMPO REAL:
+Funding Rate BTC: ${marketData.fundingBtc!=null?(marketData.fundingBtc>=0?'+':'')+marketData.fundingBtc.toFixed(4)+'%':'no disponible'} ${marketData.fundingBtc>0.05?'⚠️ SOBRECARGADO LONGS':marketData.fundingBtc<-0.01?'✅ SHORTS DOMINAN':'neutral'}
+Funding Rate ETH: ${marketData.fundingEth!=null?(marketData.fundingEth>=0?'+':'')+marketData.fundingEth.toFixed(4)+'%':'no disponible'}
+Long/Short Ratio BTC: ${marketData.lsRatio||'no disponible'} ${marketData.lsRatio>1.5?'⚠️ exceso longs':marketData.lsRatio<0.8?'✅ exceso shorts':'equilibrado'}
+Fear & Greed: ${marketData.fearGreed||'no disponible'}/100 — ${marketData.fearGreedLabel||''}
+DXY: ${marketData.dxy||'no disponible'} (${marketData.dxyChg>=0?'+':''}${marketData.dxyChg||0}%) ${marketData.dxyChg>0.5?'⚠️ dólar fuerte = presión bajista crypto':marketData.dxyChg<-0.3?'✅ dólar débil = favorable crypto':'neutral'}
+SP500: ${marketData.sp500||'no disponible'} (${marketData.sp500Chg>=0?'+':''}${marketData.sp500Chg||0}%) ${marketData.sp500Chg>1?'✅ risk-on':marketData.sp500Chg<-1?'⚠️ risk-off':'neutral'}
+M2 Liquidez global: ${marketData.m2||'~108T USD creciendo'}
+FED Rate: 4.25-4.50%`;
+
   const prompt=`Eres un trader experto en Smart Money y acción del precio. Analizas posiciones Coin-M en Bitget.
 
 RANGOS CLAVE IDENTIFICADOS POR EL TRADER:
@@ -869,14 +1115,44 @@ TP DINÁMICOS:
 → Rotura fuerte (volumen, cierre limpio): no mover SL, dejar correr hacia TP2
 → Rotura débil (mecha, rechazo): mover SL a BE, proteger
 
-DATOS:
+DATOS TÉCNICOS Y POSICIONES:
 ${ctx}
 
+DATOS DE MERCADO (futuros + macro + sentimiento):
+${mktCtx}
+
 REGLAS ABSOLUTAS:
-1. SL SIEMPRE por debajo del precio actual en LONG
-2. Todos los valores en USDT
-3. Basarte SOLO en datos técnicos reales — no inventar niveles
-4. El análisis de altcoins SIEMPRE considera el estado de BTC primero
+1. SL SIEMPRE por debajo del precio actual en LONG. NUNCA más arriesgado que el SL actual.
+2. Solo sugerir SUBIR el SL cuando el precio haya confirmado el nivel como soporte con cierre de vela.
+3. Todos los valores en USDT.
+4. Basarte SOLO en datos reales — no inventar niveles.
+5. El análisis de altcoins SIEMPRE considera el estado de BTC primero.
+
+REGLAS DE RIESGO (basadas en EMA semanal):
+- Precio < EMA21 semanal → RIESGO siempre CAUTO
+- Precio > EMA21 semanal pero < EMA50 semanal → RIESGO MODERADO
+- Precio > EMA50 semanal → RIESGO AGRESIVO permitido
+
+REGLAS DE PYRAMIDING (3 niveles según claridad):
+- NIVEL 1 — solo 4H confirma: tamaño 10-15% capital libre, SL bajo vela de entrada
+- NIVEL 2 — 4H + 3D confirman: tamaño 25-30% capital libre, SL bajo EMA21 en 3D
+- NIVEL 3 — 4H + 3D + semanal confirman: tamaño 40-50% capital libre, SL bajo EMA21 semanal
+- El SL del pyramiding se basa SOLO en la nueva entrada, no en el precio medio
+- Calcular riesgo: (entrada - SL) / entrada × margen añadido = USDT en riesgo
+- NUNCA más del 50% del capital libre en una sola entrada
+
+REGLAS ANTE RESISTENCIA:
+- Si 3D confirma estructura alcista: NO cerrar en resistencias, mover SL y esperar semanal
+- Si semanal confirma (cierre sobre EMA21 + volumen): AÑADIR AGRESIVO, no cerrar
+- Si semanal rebota abajo de EMA21: cerrar parcial 25-30%, mantener resto con SL protegido
+
+USO DE DATOS DE MERCADO EN EL ANÁLISIS:
+- Funding muy positivo (>0.05%) + precio en resistencia: recomendar PARCIAL
+- Funding negativo (<-0.01%) + señal técnica alcista: refuerza señal de entrada
+- Fear & Greed <25: señal contrarian alcista — refuerza mantener/añadir
+- Fear & Greed >75: señal de precaución — valorar parciales
+- DXY subiendo fuerte: añadir cautela extra aunque técnico sea alcista
+- SP500 bajando >1%: filtro bajista adicional para altcoins
 
 RESPONDE EXACTAMENTE CON ESTE FORMATO PARA CADA ACTIVO (sin texto fuera):
 
