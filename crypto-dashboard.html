@@ -370,8 +370,8 @@ async function loadCuenta(){
     if(histData.status==='fulfilled'&&histData.value.code==='00000'){
       const now=new Date();
       const mk=monthKey(Date.now());
-      const orders=histData.value.data?.orderList||histData.value.data?.list||histData.value.data||[];
-      orders.forEach(o=>{
+      const orders=histData.value.data?.entrustedList||histData.value.data?.orderList||histData.value.data?.list||(Array.isArray(histData.value.data)?histData.value.data:[]);
+      orders.filter(o=>(o.status==='filled'||o.status==='full_fill')&&o.tradeSide==='close').forEach(o=>{
         if(monthKey(parseInt(o.cTime||o.uTime||0))===mk){
           realizedMonth+=parseFloat(o.totalProfits||o.profit||o.realizedPL||0);
         }
@@ -614,9 +614,9 @@ async function loadHistory(){
     const data=await api('history');
     if(data.code!=='00000') throw new Error(data.msg||'Error API historial');
 
-    const raw=data.data?.orderList||data.data?.list||data.data||[];
-    // Only filled/closed orders
-    const orders=raw.filter(o=>o.status==='filled'||o.status==='full_fill'||o.status==='partially_fill'||!o.status);
+    const raw=data.data?.entrustedList||data.data?.orderList||data.data?.list||(Array.isArray(data.data)?data.data:[]);
+    // Only filled close orders (tradeSide=close) — these have PnL
+    const orders=raw.filter(o=>(o.status==='filled'||o.status==='full_fill')&&o.tradeSide==='close');
 
     cachedOrders=orders.map(o=>{
       const id=o.orderId||o.clientOid||String(Math.random());
@@ -625,7 +625,7 @@ async function loadHistory(){
       const side=o.posSide||o.side||'';
       const lev=parseInt(o.leverage||1);
       const entry=parseFloat(o.priceAvg||o.price||o.openPrice||0);
-      const exitP=parseFloat(o.fillPrice||o.avgPrice||0);
+      const exitP=parseFloat(o.priceAvg||o.fillPrice||o.avgPrice||0);
       const pnl=parseFloat(o.totalProfits||o.profit||o.pnl||o.realizedPL||0);
       const margin=parseFloat(o.marginSize||o.margin||0);
       const roe=margin>0?(pnl/margin*100):0;
