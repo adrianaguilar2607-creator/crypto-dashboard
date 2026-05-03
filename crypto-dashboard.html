@@ -32,6 +32,7 @@
 }
 
 body{background:var(–bg);color:var(–text);font-family:var(–f);max-width:390px;margin:0 auto;padding-bottom:68px;-webkit-font-smoothing:antialiased}
+html{background:var(–bg)}
 
 /* TABS */
 .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;background:var(–s1);border-top:1px solid var(–border);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
@@ -656,10 +657,10 @@ async function loadHistory(){
       const entry=parseFloat(o.posAvg||0);           // avg entry price of the position
       const exitP=parseFloat(o.priceAvg||0);          // execution price of the close order
       const pnl=parseFloat(o.totalProfits||0);
-      const quoteVol=parseFloat(o.quoteVolume||0);    // position value at close
-      const margin=quoteVol>0&&lev>0?(quoteVol/lev):0;
-      const roe=margin>0?(pnl/margin*100):0;
       const qty=parseFloat(o.baseVolume||o.size||0);
+      // Margin = position value at entry / leverage
+      const margin=entry>0&&lev>0?(entry*qty/lev):0;
+      const roe=margin>0?(pnl/margin*100):0;
       const tms=parseInt(o.cTime||o.uTime||Date.now());
       const cat=getCat(id);
       return {id,sym,base,side,lev,entry,exitP,pnl,margin,roe,qty,tms,cat};
