@@ -7,7 +7,7 @@ function sign(secret, ts, method, path, qs = '') {
   return crypto.createHmac('sha256', secret).update(msg).digest('base64');
 }
 
-function headers(key, secret, pass, ts, method, path, qs = '') {
+function makeHeaders(key, secret, pass, ts, method, path, qs = '') {
   return {
     'ACCESS-KEY': key,
     'ACCESS-SIGN': sign(secret, ts, method, path, qs),
@@ -21,12 +21,14 @@ function headers(key, secret, pass, ts, method, path, qs = '') {
 async function fetchBitget(key, secret, pass, path, qs = '') {
   const ts = Date.now().toString();
   const url = BASE + path + (qs ? '?' + qs : '');
-  const res = await fetch(url, { headers: headers(key, secret, pass, ts, 'GET', path, qs) });
+  const res = await fetch(url, {
+    headers: makeHeaders(key, secret, pass, ts, 'GET', path, qs)
+  });
   return res.json();
 }
 
 exports.handler = async function (event) {
-  const corsHeaders = {
+  const cors = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json'
@@ -37,60 +39,41 @@ exports.handler = async function (event) {
   const pass   = process.env.BITGET_PASSPHRASE;
 
   if (!key || !secret || !pass) {
-    return {
-      statusCode: 400,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: 'Variables de entorno no configuradas' })
-    };
+    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Variables de entorno no configuradas' }) };
   }
 
-  const endpoint = event.queryStringParameters?.endpoint || 'positions';
+  const ep = (event.queryStringParameters || {}).endpoint || 'positions';
 
   try {
     let data;
 
-    if (endpoint === 'positions') {
-      // Posiciones abiertas USDT-M
+    if (ep === 'positions') {
       data = await fetchBitget(key, secret, pass,
         '/api/v2/mix/position/all-position',
         'productType=USDT-FUTURES&marginCoin=USDT'
       );
 
-    } else if (endpoint === 'balance') {
-      // Balance cuenta USDT-M
+    } else if (ep === 'balance') {
       data = await fetchBitget(key, secret, pass,
         '/api/v2/mix/account/accounts',
         'productType=USDT-FUTURES'
       );
 
-    } else if (endpoint === 'history') {
-      // Historial trades cerrados USDT-M (últimos 90 días)
+    } else if (ep === 'history') {
       const endTime = Date.now();
       const startTime = endTime - 90 * 24 * 60 * 60 * 1000;
       data = await fetchBitget(key, secret, pass,
-        '/api/v2/mix/order/fills-history',
-        `productType=USDT-FUTURES&startTime=${startTime}&endTime=${endTime}&pageSize=100`
+        '/api/v2/mix/order/orders-history',
+        `productType=USDT-FUTURES&startTime=${startTime}&endTime=${endTime}&limit=100`
       );
 
     } else {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: 'Endpoint no válido. Usa: positions, balance, history' })
-      };
+      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Endpoint no valido' }) };
     }
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify(data)
-    };
+    return { statusCode: 200, headers: cors, body: JSON.stringify(data) };
 
   } catch (e) {
-    return {
-      statusCode: 500,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: e.message })
-    };
+    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: e.message }) };
   }
 };
